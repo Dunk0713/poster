@@ -490,18 +490,25 @@ body {
 .card.mood-rounded .cb-herostat .hs-value,
 .card.mood-rounded .cb-metric .m-value { font-weight: 800; }
 
-/* 报表：等宽数据感（正文 + 数字都等宽，金融报表气质） */
+/* 报表：等宽数据感。正文回退默认无衬线（等宽中英混排呆板），
+   仅标题与数据/数字块用等宽，保留金融报表气质 */
 .card.mood-mono {
-  --font-base: 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas, 'PingFang SC', "Microsoft YaHei", monospace;
   --font-display: 'JetBrains Mono', 'SF Mono', 'Source Han Sans SC', "Microsoft YaHei", monospace;
   --tr-title: 0;
   --tr-body: 0.01em;
 }
 .card.mood-mono .card-title,
 .card.mood-mono .cover-title { font-weight: 700; letter-spacing: -0.01em; }
-.card.mood-mono .cb-text,
-.card.mood-mono .cb-bullets,
-.card.mood-mono .cb-numbered { font-feature-settings: "tnum" 1, "ss01" 1; }
+.card.mood-mono .cb-table,
+.card.mood-mono .cb-metric,
+.card.mood-mono .cb-kpigrid,
+.card.mood-mono .cb-keystat,
+.card.mood-mono .cb-herostat,
+.card.mood-mono .cb-sparkcard,
+.card.mood-mono .cb-progress {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas, 'PingFang SC', "Microsoft YaHei", monospace;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
 
 /* 手写：楷体 / 手写体气质（适合温暖、感性、知识科普） */
 .card.mood-handwriting {
@@ -515,6 +522,13 @@ body {
 .card.mood-handwriting .cover-title { font-weight: 500; }
 .card.mood-handwriting .cb-highlight .mod-label,
 .card.mood-handwriting .cb-section-header .sh-label { font-weight: 500; letter-spacing: 0.02em; }
+/* 手写体在深色主题可读性差：深色下回退默认无衬线（保留手写的舒展行距） */
+.card.theme-dark.mood-handwriting,
+.card.theme-midnight.mood-handwriting,
+.card.theme-navy.mood-handwriting {
+  --font-base: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB", sans-serif;
+  --font-display: var(--font-base);
+}
 
 /* ── Global density (密度) ── */
 .card.density-compact { --space-9: 56px; --space-10: 72px; --space-block: var(--space-4); }
