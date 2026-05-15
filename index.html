@@ -2248,7 +2248,7 @@ function createPage(tpl = 'text') {
     coverTag: '', coverDeco: '◆ ◆ ◆',
     coverVariant: '', coverIndex: '01',
     greeting: '', dashDate: '', dashRange: '',
-    fullImgCaption: '', fullImgFit: 'cover',
+    fullImgCaption: '',  // imageOnly 的图片适配统一用 page.imageFit（1.5：不再单列 fullImgFit）
     heroValue: '', heroLabel: '',
     // dataCard 表格统一为一个 table 块对象（与 table 块同结构/同渲染/同编辑管线）
     tableData: makeBlock('table'),
@@ -3359,10 +3359,10 @@ function renderEditorFields_raw() {
         </div>
         <input type="file" id="mainImgInput" accept="image/*" style="display:none">
         <div class="seg-row" style="margin-top:6px" id="fullImgFitRow">
-          <button class="seg-btn ${page.fullImgFit==='cover'?'active':''}" data-fit="cover">填充裁剪</button>
-          <button class="seg-btn ${page.fullImgFit==='contain'?'active':''}" data-fit="contain">完整显示</button>
+          <button class="seg-btn ${page.imageFit==='cover'?'active':''}" data-fit="cover">填充裁剪</button>
+          <button class="seg-btn ${page.imageFit==='contain'?'active':''}" data-fit="contain">完整显示</button>
         </div>
-        ${page.fullImgFit==='cover' && page.image ? `
+        ${page.imageFit==='cover' && page.image ? `
         <div class="focal-preview" id="focalFull">
           <img src="${page.image}">
           <div class="focal-dot" style="left:${page.cropX||50}%;top:${page.cropY||50}%"></div>
@@ -3439,6 +3439,9 @@ function migrateState(data) {
   data.pages = data.pages.map(p => {
     const merged = Object.assign(createPage((p && p.template) || 'text'), p || {});
     merged.blocks = Array.isArray(merged.blocks) ? merged.blocks.map(migrateBlock) : [];
+    // 1.5：统一图片适配字段——旧 fullImgFit(imageOnly 专用) 并入 imageFit，保留旧值
+    merged.imageFit = (p && (p.imageFit || p.fullImgFit)) || 'contain';
+    delete merged.fullImgFit;
     // 旧版 dataCard：扁平 tableHeaders/tableRows(字符串数组) → 统一的 tableData(table 块对象)
     if (p && Array.isArray(p.tableRows) && !p.tableData) {
       const td = makeBlock('table');
@@ -3893,9 +3896,9 @@ function bindEditorEvents() {
   bind('fCTag', page, 'coverTag', true);
   bind('fFullCap', page, 'fullImgCaption', true);
 
-  // Full image fit toggles (imageOnly template)
+  // Full image fit toggles (imageOnly template) — 统一写 page.imageFit
   document.querySelectorAll('#fullImgFitRow .seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => { page.fullImgFit = btn.dataset.fit; renderEditorFields(); renderCard(); });
+    btn.addEventListener('click', () => { page.imageFit = btn.dataset.fit; renderEditorFields(); renderCard(); });
   });
   // Full image focal point picker (imageOnly template)
   const focalFull = document.getElementById('focalFull');
@@ -4933,7 +4936,7 @@ function renderCard() {
     els.cardContent.classList.add('fullimg-layout');
     h = '';
     if (page.image) {
-      const fullFit = page.fullImgFit || 'cover';
+      const fullFit = page.imageFit || 'contain';
       const fullPos = fullFit === 'cover' ? `;object-position:${page.cropX||50}% ${page.cropY||50}%` : '';
       h += `<div class="fullimg-wrap"><img src="${page.image}" style="object-fit:${fullFit}${fullPos}">`;
       if (page.fullImgCaption) h += `<div class="fullimg-caption">${esc(page.fullImgCaption)}</div>`;
