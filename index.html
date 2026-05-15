@@ -5100,12 +5100,14 @@ els.paletteRow.addEventListener('click', e => { const s=e.target.closest('.theme
 els.fontSizeRow.addEventListener('click', e => { const b=e.target.closest('.font-size-btn'); if(!b)return; state.fontSize=b.dataset.size; renderFontSize(); renderCard(); });
 
 // ── Typography preset: apply coordinated spacing/lineHeight/fontWeight across all blocks ──
+// 直接写 canonical 的 rhythm（renderBlock 只认 blk.rhythm，旧 spacing/lineHeight
+// 在有 rhythm 时被忽略；1.0 接入 migrateBlock 后块普遍带 rhythm，故必须写 rhythm 才生效）
 const TYPO_PRESETS = {
-  compact:   { spacing: 'tight',  lineHeight: 'compact', fontWeight: '',       desc: '紧凑 · 密集信息流，适合数据密集型笔记' },
-  balanced:  { spacing: '',       lineHeight: '',        fontWeight: '',       desc: '平衡 · 默认推荐，文字与留白均衡' },
-  breathing: { spacing: 'loose',  lineHeight: 'relaxed', fontWeight: '',       desc: '呼吸 · 强调留白，正文行距更舒展' },
-  editorial: { spacing: 'loose',  lineHeight: 'relaxed', fontWeight: 'medium', desc: '杂志 · 层次分明，正文略加重' },
-  reset:     { spacing: '',       lineHeight: '',        fontWeight: '',       desc: '已清除所有自定义节奏' },
+  compact:   { rhythm: 'tight',  fontWeight: '',       desc: '紧凑 · 密集信息流，适合数据密集型笔记' },
+  balanced:  { rhythm: '',       fontWeight: '',       desc: '平衡 · 默认推荐，文字与留白均衡' },
+  breathing: { rhythm: 'loose',  fontWeight: '',       desc: '呼吸 · 强调留白，正文行距更舒展' },
+  editorial: { rhythm: 'loose',  fontWeight: 'medium', desc: '杂志 · 层次分明，正文略加重' },
+  reset:     { rhythm: '',       fontWeight: '',       desc: '已清除所有自定义节奏' },
 };
 const typoPresetRow = document.getElementById('typoPresetRow');
 const typoPresetHint = document.getElementById('typoPresetHint');
@@ -5119,26 +5121,36 @@ if (typoPresetRow) {
   typoPresetRow.addEventListener('click', e => {
     const b = e.target.closest('.font-size-btn');
     if (!b) return;
-    const preset = TYPO_PRESETS[b.dataset.preset];
+    const presetKey = b.dataset.preset;
+    const preset = TYPO_PRESETS[presetKey];
     if (!preset) return;
     const page = cp();
-    page.blocks.forEach(blk => {
-      if (blk.type === 'divider' || blk.type === 'image') return;
-      if (b.dataset.preset === 'reset') {
-        if (blk.spacing || blk.lineHeight || blk.fontWeight || blk.rhythm) {
-          blk.spacing = ''; blk.lineHeight = ''; blk.fontWeight = ''; blk.rhythm = '';
-        }
-      } else {
-        blk.spacing = preset.spacing;
-        blk.lineHeight = preset.lineHeight;
-        blk.fontWeight = preset.fontWeight;
-      }
+    const eligible = (page.blocks || []).filter(blk => blk.type !== 'divider' && blk.type !== 'image');
+    if (!eligible.length) {
+      showToast('当前页没有可调整排版节奏的模块', 'warn', 2600);
+      return;
+    }
+    // 统计将被覆盖的「手工调过排版」的模块数（rhythm/spacing/lineHeight/fontWeight 与目标不一致）
+    const isReset = presetKey === 'reset';
+    let overridden = 0;
+    eligible.forEach(blk => {
+      const hadManual = blk.rhythm || blk.spacing || blk.lineHeight || blk.fontWeight;
+      const willChange = isReset
+        ? !!hadManual
+        : (blk.rhythm !== preset.rhythm || blk.fontWeight !== preset.fontWeight || blk.spacing || blk.lineHeight);
+      if (hadManual && willChange) overridden++;
+      // 统一写 canonical rhythm，并清掉旧 spacing/lineHeight（单一真源，避免与 rhythm 打架）
+      blk.rhythm = preset.rhythm;
+      blk.fontWeight = preset.fontWeight;
+      blk.spacing = '';
+      blk.lineHeight = '';
     });
-    state.typoPreset = b.dataset.preset === 'reset' ? '' : b.dataset.preset;
+    state.typoPreset = isReset ? '' : presetKey;
     _syncTypoPresetActive();
     renderEditorFields(); renderCard();
     pushHistory(`排版·${b.textContent.trim()}`);
-    showToast(`✓ ${TYPO_PRESETS[b.dataset.preset].desc}`);
+    const extra = overridden ? `（含 ${overridden} 个你手动调过的模块一并统一）` : '';
+    showToast(`${preset.desc}${extra}`, 'success', overridden ? 3600 : 2400);
   });
   _syncTypoPresetActive();  // 初始化
 }
