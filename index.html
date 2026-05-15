@@ -2106,14 +2106,11 @@ const BLOCK_TYPES = {
   highlight: '高亮模块',
   quote:     '引用 / 金句',
   infocard:  '信息卡片',
-  keystat:   '核心数据',
-  herostat:  '巨型数字',
-  metric:    '指标·对比',
+  keystat:   '数据 / 指标',
   ranking:   '排名列表',
   progress:  '进度环',
   kpigrid:   'KPI 网格',
   sparkcard: '走势卡',
-  compare:   '对比指标',
   callout:   '语义卡片',
   tldr:      '一图速览',
   source:    '数据来源',
@@ -2171,10 +2168,10 @@ function makeBlock(type) {
     case 'highlight': return { ...base, type, label: '', content: '', labelSize: '', labelStyle: '' };
     case 'quote':     return { ...base, type, variant: '', content: '', source: '' };
     case 'infocard':  return { ...base, type, num: '', title: '', desc: '' };
-    case 'keystat':   return { ...base, type, value: '', label: '' };
-    case 'herostat':  return { ...base, type, value: '8.2%', label: '年化收益率', caption: '' };
+    case 'keystat':   return { ...base, type, variant: '', value: '', label: '', caption: '', delta: '', deltaDir: 'up', deltaLabel: '', chipLabel: '', chipValue: '' };
+    case 'herostat':  return { ...base, type: 'keystat', variant: 'hero', value: '8.2%', label: '年化收益率', caption: '', delta: '', deltaDir: 'up', deltaLabel: '', chipLabel: '', chipValue: '' };
     case 'pullquote': return { ...base, type: 'quote', variant: 'featured', content: '市场不会奖励正确，只会奖励耐心。', source: '彼得·林奇' };
-    case 'metric':    return { ...base, type, value: '8.2%', label: '年化收益', delta: '+12%', deltaDir: 'up', deltaLabel: 'vs 上月' };
+    case 'metric':    return { ...base, type: 'keystat', variant: 'metric', value: '8.2%', label: '年化收益', delta: '+12%', deltaDir: 'up', deltaLabel: 'vs 上月', caption: '', chipLabel: '', chipValue: '' };
     case 'ranking':   return { ...base, type, title: 'TOP 基金', items: [
       { name: '易方达蓝筹', value: '23.5%', pct: 100 },
       { name: '中欧医疗', value: '17.2%', pct: 72 },
@@ -2188,7 +2185,7 @@ function makeBlock(type) {
       { value: '1.42', label: '夏普比率', delta: '0', deltaDir: 'flat' }
     ] };
     case 'sparkcard': return { ...base, type, title: '净值走势', value: '1.2456', delta: '+0.8%', deltaDir: 'up', values: '1.12,1.15,1.14,1.18,1.22,1.20,1.24,1.2456' };
-    case 'compare':   return { ...base, type, label: '中欧沪深300指数量化增强A', value: '29.88%', chipLabel: '超额收益', chipValue: '+16.09%' };
+    case 'compare':   return { ...base, type: 'keystat', variant: 'compare', label: '中欧沪深300指数量化增强A', value: '29.88%', chipLabel: '超额收益', chipValue: '+16.09%', caption: '', delta: '', deltaDir: 'up', deltaLabel: '' };
     case 'callout':   return { ...base, type, variant: 'note', title: '补充说明', content: '在此写入提示、警示或引用内容。' };
     case 'tldr':      return { ...base, type, badge: '速览', title: '一图速览', points: ['核心观点 1', '核心观点 2', '核心观点 3'] };
     case 'source':    return { ...base, type, items: [
@@ -2263,6 +2260,16 @@ function migrateBlock(blk) {
     if (!blk.variant) blk.variant = 'featured';
     if (!blk.content && blk.text) blk.content = blk.text;
     delete blk.text;
+  }
+  if (blk.type === 'herostat' || blk.type === 'metric' || blk.type === 'compare') {
+    const v = { herostat: 'hero', metric: 'metric', compare: 'compare' }[blk.type];
+    blk.type = 'keystat';
+    if (!blk.variant) blk.variant = v;
+  }
+  if (blk.type === 'keystat') {
+    if (blk.variant === undefined) blk.variant = '';
+    ['value','label','caption','delta','deltaLabel','chipLabel','chipValue'].forEach(k => { if (blk[k] === undefined) blk[k] = ''; });
+    if (!blk.deltaDir) blk.deltaDir = 'up';
   }
   // 字段兜底（旧笔记打开不报错）
   if (blk.type === 'panel'  && !Array.isArray(blk.children)) blk.children = [];
@@ -2831,31 +2838,37 @@ function _edBlockFields(blk, bi) {
         <input class="form-input" id="b${bi}_t" value="${escAttr(blk.title)}" placeholder="卡片标题">
       </div>
       <textarea class="form-textarea" id="b${bi}_d" rows="2" placeholder="描述 **加粗** ==色==">${escAttr(blk.desc)}</textarea>`;
-    case 'keystat':
-      return `<div class="data-row">
-        <input class="form-input" id="b${bi}_v" value="${escAttr(blk.value)}" placeholder="数值 如 8.2%">
-        <input class="form-input" id="b${bi}_l" value="${escAttr(blk.label)}" placeholder="说明 如 近1年涨幅">
-      </div>`;
-    case 'herostat':
-      return `<div class="data-row">
-        <input class="form-input" id="b${bi}_v" value="${escAttr(blk.value)}" placeholder="巨型数字 如 23.5%">
-        <input class="form-input" id="b${bi}_l" value="${escAttr(blk.label)}" placeholder="标签 如 近三年累计收益">
-      </div>
-      <input class="form-input" id="b${bi}_cap" value="${escAttr(blk.caption||'')}" placeholder="说明文字（可选）" style="margin-top:6px">`;
-    case 'metric':
-      return `<div class="data-row">
-        <input class="form-input" id="b${bi}_v" value="${escAttr(blk.value||'')}" placeholder="数值 如 8.2%">
-        <input class="form-input" id="b${bi}_l" value="${escAttr(blk.label||'')}" placeholder="标签 如 年化收益">
+    case 'keystat': {
+      const kv = blk.variant || '';
+      let s = `<div class="seg-row" id="ksv_${bi}">
+        <button class="seg-btn ${!kv?'active':''}" data-ksv="">核心数据</button>
+        <button class="seg-btn ${kv==='hero'?'active':''}" data-ksv="hero">巨型数字</button>
+        <button class="seg-btn ${kv==='metric'?'active':''}" data-ksv="metric">指标·差值</button>
+        <button class="seg-btn ${kv==='compare'?'active':''}" data-ksv="compare">对比药丸</button>
       </div>
       <div class="data-row" style="margin-top:6px">
-        <input class="form-input" id="b${bi}_d" value="${escAttr(blk.delta||'')}" placeholder="差值 如 +12%" style="flex:0.7">
-        <input class="form-input" id="b${bi}_dl" value="${escAttr(blk.deltaLabel||'')}" placeholder="差值说明 如 vs 上月">
-      </div>
-      <div class="seg-row" style="margin-top:6px" id="metricDirRow_${bi}">
-        <button class="seg-btn ${blk.deltaDir==='up'||!blk.deltaDir?'active':''}" data-mdir="up">▲ 涨</button>
-        <button class="seg-btn ${blk.deltaDir==='down'?'active':''}" data-mdir="down">▼ 跌</button>
-        <button class="seg-btn ${blk.deltaDir==='flat'?'active':''}" data-mdir="flat">— 持平</button>
+        <input class="form-input" id="b${bi}_v" value="${escAttr(blk.value||'')}" placeholder="${kv==='compare'?'主数值 如 29.88%':kv==='hero'?'巨型数字 如 23.5%':'数值 如 8.2%'}">
+        <input class="form-input" id="b${bi}_l" value="${escAttr(blk.label||'')}" placeholder="${kv==='compare'?'名称 如 中欧沪深300增强A':kv==='hero'?'标签 如 近三年累计收益':'说明 如 近1年涨幅'}">
       </div>`;
+      if (kv === 'hero')
+        s += `<input class="form-input" id="b${bi}_cap" value="${escAttr(blk.caption||'')}" placeholder="说明文字（可选）" style="margin-top:6px">`;
+      if (kv === 'metric')
+        s += `<div class="data-row" style="margin-top:6px">
+          <input class="form-input" id="b${bi}_d" value="${escAttr(blk.delta||'')}" placeholder="差值 如 +12%" style="flex:0.7">
+          <input class="form-input" id="b${bi}_dl" value="${escAttr(blk.deltaLabel||'')}" placeholder="差值说明 如 vs 上月">
+        </div>
+        <div class="seg-row" style="margin-top:6px" id="metricDirRow_${bi}">
+          <button class="seg-btn ${blk.deltaDir==='up'||!blk.deltaDir?'active':''}" data-mdir="up">▲ 涨</button>
+          <button class="seg-btn ${blk.deltaDir==='down'?'active':''}" data-mdir="down">▼ 跌</button>
+          <button class="seg-btn ${blk.deltaDir==='flat'?'active':''}" data-mdir="flat">— 持平</button>
+        </div>`;
+      if (kv === 'compare')
+        s += `<div class="data-row" style="margin-top:6px">
+          <input class="form-input" id="b${bi}_cl" value="${escAttr(blk.chipLabel||'')}" placeholder="药丸标签 如 超额收益" style="flex:0.5">
+          <input class="form-input" id="b${bi}_cv" value="${escAttr(blk.chipValue||'')}" placeholder="药丸数值 如 +16.09%" style="flex:0.5">
+        </div>`;
+      return s;
+    }
     case 'ranking': {
       let rh = `<input class="form-input" id="b${bi}_t" value="${escAttr(blk.title||'')}" placeholder="列表标题（可选）" style="margin-bottom:6px">`;
       blk.items.forEach((it, ii) => {
@@ -2926,16 +2939,6 @@ function _edBlockFields(blk, bi) {
         </div>
       </div>
       <textarea class="form-textarea" id="b${bi}_vals" rows="2" placeholder="数据点 逗号分隔 如 1.12,1.15,1.14,1.22" style="margin-top:6px;font-family:monospace">${escAttr(blk.values||'')}</textarea>`;
-    case 'compare': {
-      return `<input class="form-input" id="b${bi}_lbl" value="${escAttr(blk.label||'')}" placeholder="名称 如 中欧沪深300增强A">
-        <div class="data-row" style="margin-top:6px">
-          <input class="form-input" id="b${bi}_v" value="${escAttr(blk.value||'')}" placeholder="主数值 如 29.88%">
-        </div>
-        <div class="data-row" style="margin-top:6px">
-          <input class="form-input" id="b${bi}_cl" value="${escAttr(blk.chipLabel||'')}" placeholder="药丸标签 如 超额收益" style="flex:0.5">
-          <input class="form-input" id="b${bi}_cv" value="${escAttr(blk.chipValue||'')}" placeholder="药丸数值 如 +16.09%" style="flex:0.5">
-        </div>`;
-    }
     case 'callout': {
       const variants = [
         { id:'note', label:'ℹ 提示' }, { id:'tip', label:'✦ 建议' },
@@ -3292,7 +3295,7 @@ function _renderBlocksUI(page) {
   h += `</div>`;
   const BLOCK_GROUPS = [
     { label: '文本', types: ['text','bullets','numbered','checklist','highlight','callout','quote','infocard','sectionHeader'] },
-    { label: '数据', types: ['keystat','herostat','metric','compare','kpigrid','ranking','progress','sparkcard','table'] },
+    { label: '数据', types: ['keystat','kpigrid','ranking','progress','sparkcard','table'] },
     { label: '视觉', types: ['image','gallery','textWrap','tags','qrcode'] },
     { label: '版式', types: ['tldr','panel','grid','divider','source','disclaimer'] },
   ];
@@ -4252,16 +4255,26 @@ function bindEditorEvents() {
       });
     }
     else if (blk.type === 'infocard')  { bnd('n',blk,'num',true); bnd('t',blk,'title',true); bnd('d',blk,'desc',true); }
-    else if (blk.type === 'keystat')   { bnd('v',blk,'value',true); bnd('l',blk,'label',true); }
-    else if (blk.type === 'herostat')  { bnd('v',blk,'value',true); bnd('l',blk,'label',true); bnd('cap',blk,'caption',true); }
-    else if (blk.type === 'metric') {
-      bnd('v',blk,'value',true); bnd('l',blk,'label',true); bnd('d',blk,'delta',true); bnd('dl',blk,'deltaLabel',true);
-      document.querySelectorAll(`#metricDirRow_${bi} [data-mdir]`).forEach(btn => {
-        btn.addEventListener('click', () => {
-          blk.deltaDir = btn.dataset.mdir;
-          document.querySelectorAll(`#metricDirRow_${bi} [data-mdir]`).forEach(b => b.classList.toggle('active', b.dataset.mdir === blk.deltaDir));
-          renderCard();
+    else if (blk.type === 'keystat') {
+      const kv = blk.variant || '';
+      bnd('v',blk,'value',true); bnd('l',blk,'label',true);
+      if (kv === 'hero') bnd('cap',blk,'caption',true);
+      if (kv === 'metric') {
+        bnd('d',blk,'delta',true); bnd('dl',blk,'deltaLabel',true);
+        document.querySelectorAll(`#metricDirRow_${bi} [data-mdir]`).forEach(btn => {
+          btn.addEventListener('click', () => {
+            blk.deltaDir = btn.dataset.mdir;
+            document.querySelectorAll(`#metricDirRow_${bi} [data-mdir]`).forEach(b => b.classList.toggle('active', b.dataset.mdir === blk.deltaDir));
+            renderCard();
+          });
         });
+      }
+      if (kv === 'compare') { bnd('cl',blk,'chipLabel',true); bnd('cv',blk,'chipValue',true); }
+      const ksv=document.getElementById(`ksv_${bi}`);
+      if (ksv) ksv.addEventListener('click', e => {
+        const b=e.target.closest('.seg-btn'); if(!b)return;
+        blk.variant=b.dataset.ksv;
+        renderEditorFields(); renderCard();
       });
     }
     else if (blk.type === 'ranking') {
@@ -4315,12 +4328,6 @@ function bindEditorEvents() {
           renderCard();
         });
       });
-    }
-    else if (blk.type === 'compare') {
-      bnd('lbl', blk, 'label', true);
-      bnd('v', blk, 'value', true);
-      bnd('cl', blk, 'chipLabel', true);
-      bnd('cv', blk, 'chipValue', true);
     }
     else if (blk.type === 'callout') {
       bnd('t', blk, 'title', true);
@@ -4698,18 +4705,30 @@ function renderBlock(blk, sz) {
       return `<div class="cb-quote${bsCls}${extraCls}"${hasColorAttr}${wrapStyle}><div class="q-text ${effectiveSz}">${parseBody(blk.content)}</div>${blk.source?`<div class="q-source">— ${esc(blk.source)}</div>`:''}</div>`;
     case 'infocard':
       return `<div class="cb-infocard${bsCls}${extraCls}"${wrapStyle}>${blk.num?`<div class="ic-num">${esc(blk.num)}</div>`:''}${blk.title?`<div class="ic-title ${effectiveSz}">${esc(blk.title)}</div>`:''}${blk.desc?`<div class="ic-desc ${effectiveSz}">${parseBody(blk.desc)}</div>`:''}</div>`;
-    case 'keystat':
+    case 'keystat': {
+      const kv = blk.variant || '';
+      if (kv === 'hero')
+        return `<div class="cb-herostat${extraCls}"${wrapStyle}>${blk.value?`<div class="hs-value">${esc(blk.value)}</div>`:''}<div class="hs-sep"></div>${blk.label?`<div class="hs-label">${esc(blk.label)}</div>`:''}${blk.caption?`<div class="hs-caption">${inl(blk.caption)}</div>`:''}</div>`;
+      if (kv === 'metric') {
+        const dir = blk.deltaDir || 'up';
+        const szCls = effectiveSz ? ` ${effectiveSz}` : '';
+        return `<div class="cb-metric${szCls}${extraCls}"${wrapStyle}>
+          ${blk.label?`<div class="m-label">${esc(blk.label)}</div>`:''}
+          ${blk.value?`<div class="m-value">${esc(blk.value)}</div>`:''}
+          ${(blk.delta||blk.deltaLabel)?`<div class="m-delta-row">${blk.delta?`<span class="cb-delta dir-${dir}">${esc(blk.delta)}</span>`:''}${blk.deltaLabel?`<span class="cb-delta-label">${esc(blk.deltaLabel)}</span>`:''}</div>`:''}
+        </div>`;
+      }
+      if (kv === 'compare') {
+        if (!blk.label && !blk.value && !blk.chipValue) return '';
+        const chipNum = blk.chipValue ? parseFloat(blk.chipValue) : NaN;
+        const chipCls = isNaN(chipNum) ? '' : chipNum > 0 ? ' chip-pos' : chipNum < 0 ? ' chip-neg' : '';
+        return `<div class="cb-stat-compare ${effectiveSz}${extraCls}"${wrapStyle}>
+          ${blk.label?`<div class="sc-label">${inl(blk.label)}</div>`:''}
+          ${blk.value?`<div class="sc-value">${esc(blk.value)}</div>`:''}
+          ${blk.chipValue?`<div class="sc-chip${chipCls}">${blk.chipLabel?`<span style="font-size:0.55em;font-weight:600;letter-spacing:0.1em;margin-right:6px;opacity:0.85">${esc(blk.chipLabel)}</span>`:''}${esc(blk.chipValue)}</div>`:''}
+        </div>`;
+      }
       return `<div class="cb-keystat ${effectiveSz}${bsCls}${extraCls}"${wrapStyle}>${blk.value?`<div class="ks-value">${esc(blk.value)}</div>`:''}${blk.label?`<div class="ks-label">${esc(blk.label)}</div>`:''}</div>`;
-    case 'herostat':
-      return `<div class="cb-herostat${extraCls}"${wrapStyle}>${blk.value?`<div class="hs-value">${esc(blk.value)}</div>`:''}<div class="hs-sep"></div>${blk.label?`<div class="hs-label">${esc(blk.label)}</div>`:''}${blk.caption?`<div class="hs-caption">${inl(blk.caption)}</div>`:''}</div>`;
-    case 'metric': {
-      const dir = blk.deltaDir || 'up';
-      const szCls = effectiveSz ? ` ${effectiveSz}` : '';
-      return `<div class="cb-metric${szCls}${extraCls}"${wrapStyle}>
-        ${blk.label?`<div class="m-label">${esc(blk.label)}</div>`:''}
-        ${blk.value?`<div class="m-value">${esc(blk.value)}</div>`:''}
-        ${(blk.delta||blk.deltaLabel)?`<div class="m-delta-row">${blk.delta?`<span class="cb-delta dir-${dir}">${esc(blk.delta)}</span>`:''}${blk.deltaLabel?`<span class="cb-delta-label">${esc(blk.deltaLabel)}</span>`:''}</div>`:''}
-      </div>`;
     }
     case 'ranking': {
       const items = (blk.items||[]).filter(it => it && (it.name||it.value));
@@ -4761,16 +4780,6 @@ function renderBlock(blk, sz) {
           ${blk.delta?`<span class="cb-delta dir-${dir}">${esc(blk.delta)}</span>`:''}
         </div>
         <div class="sc-chart">${svgSparkline(blk.values, 600, 56)}</div>
-      </div>`;
-    }
-    case 'compare': {
-      if (!blk.label && !blk.value && !blk.chipValue) return '';
-      const chipNum = blk.chipValue ? parseFloat(blk.chipValue) : NaN;
-      const chipCls = isNaN(chipNum) ? '' : chipNum > 0 ? ' chip-pos' : chipNum < 0 ? ' chip-neg' : '';
-      return `<div class="cb-stat-compare ${effectiveSz}${extraCls}"${wrapStyle}>
-        ${blk.label?`<div class="sc-label">${inl(blk.label)}</div>`:''}
-        ${blk.value?`<div class="sc-value">${esc(blk.value)}</div>`:''}
-        ${blk.chipValue?`<div class="sc-chip${chipCls}">${blk.chipLabel?`<span style="font-size:0.55em;font-weight:600;letter-spacing:0.1em;margin-right:6px;opacity:0.85">${esc(blk.chipLabel)}</span>`:''}${esc(blk.chipValue)}</div>`:''}
       </div>`;
     }
     case 'callout': {
