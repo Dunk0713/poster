@@ -2131,7 +2131,8 @@ const BLOCK_COLORS = [
 ];
 
 function makeBlock(type) {
-  const base = { customSize: '', customColor: '', blockStyle: '', spacing: '', lineHeight: '', fontWeight: '' };
+  // 1.6：canonical 排版字段只保留 rhythm + fontWeight（旧 spacing/lineHeight 由 migrateBlock 收敛后删除）
+  const base = { customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '' };
   switch(type) {
     case 'text':      return { ...base, type, content: '' };
     case 'bullets':   return { ...base, type, items: [''] };
@@ -2209,10 +2210,19 @@ function migrateBlock(blk) {
   // Legacy size values ms/ml → small/large
   if (blk.customSize === 'ms') blk.customSize = 'small';
   if (blk.customSize === 'ml') blk.customSize = 'large';
-  // Legacy spacing field → rhythm (spacing='extra' existed; map to 'breath')
-  if (blk.spacing && !blk.rhythm) {
-    const map = { tight: 'tight', loose: 'loose', extra: 'breath' };
-    if (map[blk.spacing]) blk.rhythm = map[blk.spacing];
+  // Legacy spacing/lineHeight → 统一 rhythm，并删除遗留字段（单一真源）
+  // 注意：divider.spacing 是其自身「间距档」语义，不在收敛范围
+  if (blk.type !== 'divider') {
+    if (blk.spacing && !blk.rhythm) {
+      const map = { tight: 'tight', loose: 'loose', extra: 'breath' };
+      if (map[blk.spacing]) blk.rhythm = map[blk.spacing];
+    }
+    if (blk.lineHeight && !blk.rhythm) {
+      const lhMap = { compact: 'tight', relaxed: 'loose' };
+      if (lhMap[blk.lineHeight]) blk.rhythm = lhMap[blk.lineHeight];
+    }
+    delete blk.spacing;
+    delete blk.lineHeight;
   }
   // Legacy fontWeight heavy → bold
   if (blk.fontWeight === 'heavy') blk.fontWeight = 'bold';
@@ -2232,6 +2242,10 @@ function migrateBlock(blk) {
     if (!Array.isArray(blk.colAligns)) blk.colAligns = [];
     if (!Array.isArray(blk.colWidths)) blk.colWidths = [];
     if (!Array.isArray(blk.highlightRows)) blk.highlightRows = [];
+  }
+  // panel 子块递归迁移（此前从未迁移，旧档嵌套块的遗留字段会漏收敛）
+  if (blk.type === 'panel' && Array.isArray(blk.children)) {
+    blk.children = blk.children.map(migrateBlock);
   }
   return blk;
 }
@@ -2316,10 +2330,10 @@ Object.assign(state.pages[0], {
   title: '基金定投的\n三个核心原则',
   subtitle: '长期主义者的投资智慧',
   blocks: [
-    { type: 'text', content: '定投是普通投资者参与市场最**有效**的方式之一。通过分散买入时点，降低择时风险，积累长期收益。', spacing: 'loose', lineHeight: 'relaxed' },
+    { type: 'text', content: '定投是普通投资者参与市场最**有效**的方式之一。通过分散买入时点，降低择时风险，积累长期收益。', rhythm: 'loose' },
     { type: 'sectionHeader', label: '三大原则', num: '01', shStyle: '' },
-    { type: 'bullets', items: ['坚持==长期定投==，至少3年以上', '选择波动适中的**宽基指数**基金', '设定合理的止盈目标，落袋为安'], lineHeight: 'relaxed', spacing: 'loose' },
-    { type: 'highlight', label: '核心理念', content: '**纪律性**比任何择时策略都重要。下跌时坚持定投，反而能摊低成本。', spacing: 'loose' },
+    { type: 'bullets', items: ['坚持==长期定投==，至少3年以上', '选择波动适中的**宽基指数**基金', '设定合理的止盈目标，落袋为安'], rhythm: 'loose' },
+    { type: 'highlight', label: '核心理念', content: '**纪律性**比任何择时策略都重要。下跌时坚持定投，反而能摊低成本。', rhythm: 'loose' },
     { type: 'tags', items: ['#宽基指数', '#长期主义', '#定投策略', '#基金入门'] },
   ],
 });
@@ -2667,12 +2681,12 @@ function blkTexture(blk) {
   if (w === 'bold' || w === 'heavy' || r === 'tight') return 'solid';
   return '';
 }
-// Apply a texture preset to a block
+// Apply a texture preset to a block（只写 canonical rhythm+fontWeight，清掉遗留字段）
 function applyBlkTexture(blk, tx) {
-  blk.spacing = '';
-  if (tx === 'air')   { blk.rhythm = 'loose'; blk.fontWeight = 'light'; blk.lineHeight = 'relaxed'; }
-  else if (tx === 'solid') { blk.rhythm = 'tight'; blk.fontWeight = 'bold'; blk.lineHeight = 'compact'; }
-  else { blk.rhythm = ''; blk.fontWeight = ''; blk.lineHeight = ''; }
+  delete blk.spacing; delete blk.lineHeight;
+  if (tx === 'air')   { blk.rhythm = 'loose'; blk.fontWeight = 'light'; }
+  else if (tx === 'solid') { blk.rhythm = 'tight'; blk.fontWeight = 'bold'; }
+  else { blk.rhythm = ''; blk.fontWeight = ''; }
 }
 
 // 嵌套面板子块的紧凑字段（与顶级 _edBlockFields 共享 inputId 规范：b{parentBi}_c{ci}_{field}）
@@ -4549,12 +4563,10 @@ function renderBlock(blk, sz) {
   const cStyle = resolveBlockColor(blk);
   const wrapStyle = cStyle ? ` style="${cStyle}"` : '';
   const bsCls = blk.blockStyle ? ` block-${blk.blockStyle}` : '';
-  // Spacing / line-height / font-weight / rhythm classes (applied to block root)
-  // rhythm (new unified control) takes precedence over legacy spacing+lineHeight
+  // 排版节奏：canonical 只有 rhythm + fontWeight（旧 spacing/lineHeight 已由
+  // migrateBlock 全量收敛删除，所有入口[init/导入/恢复]均过 migrateState）
   const extraCls =
     (blk.rhythm ? ` rh-${blk.rhythm}` : '') +
-    (!blk.rhythm && blk.spacing ? ` sp-${blk.spacing}` : '') +
-    (!blk.rhythm && blk.lineHeight ? ` lh-${blk.lineHeight}` : '') +
     (blk.fontWeight ? ` fw-${blk.fontWeight}` : '');
   const hasColorAttr = blk.customColor ? ' data-has-color' : '';
 
@@ -5142,11 +5154,11 @@ if (typoPresetRow) {
         ? !!hadManual
         : (blk.rhythm !== preset.rhythm || blk.fontWeight !== preset.fontWeight || blk.spacing || blk.lineHeight);
       if (hadManual && willChange) overridden++;
-      // 统一写 canonical rhythm，并清掉旧 spacing/lineHeight（单一真源，避免与 rhythm 打架）
+      // 统一写 canonical rhythm，并移除旧 spacing/lineHeight（单一真源，避免与 rhythm 打架）
       blk.rhythm = preset.rhythm;
       blk.fontWeight = preset.fontWeight;
-      blk.spacing = '';
-      blk.lineHeight = '';
+      delete blk.spacing;
+      delete blk.lineHeight;
     });
     state.typoPreset = isReset ? '' : presetKey;
     _syncTypoPresetActive();
