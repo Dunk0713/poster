@@ -2044,6 +2044,10 @@ body {
             <label class="form-label">总期数</label>
             <input class="form-input" id="seriesTotal" placeholder="如 10">
           </div>
+          <div class="form-group">
+            <label class="form-label">单位</label>
+            <input class="form-input" id="seriesUnit" placeholder="期 / 讲 / 章">
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">数据日期 <span style="color:#b0a090;font-weight:400">（YYYY-MM-DD，留空用今日）</span></label>
@@ -2307,7 +2311,7 @@ const state = {
   footerCta: '', footerStyle: '',  // CTA 文案 + 风格 minimal/bold/hide
   typoPreset: '',  // 已应用的排版预设（持久化以便 active 状态恢复）
   dataDate: '',    // 全局数据日期戳（YYYY-MM-DD）
-  seriesName: '', seriesIndex: '', seriesTotal: '',  // 系列元数据
+  seriesName: '', seriesIndex: '', seriesTotal: '', seriesUnit: '期',  // 系列元数据（单位可定制：期/讲/章…）
   cardW: 1080, cardH: 1440,
   _uiFolded: new Set(),
 };
@@ -3483,7 +3487,7 @@ const PERSIST_KEY = 'rnxhs:autosave';
 
 // 同步左侧静态全局元数据 input（这些控件不由 renderEditorFields 重建，需手动回填）
 function _syncGlobalMetaInputs() {
-  ['authorName','authorTitle','footerCta','seriesName','seriesIndex','seriesTotal','dataDate'].forEach(k => {
+  ['authorName','authorTitle','footerCta','seriesName','seriesIndex','seriesTotal','seriesUnit','dataDate'].forEach(k => {
     const el = document.getElementById(k);
     if (el && typeof state[k] === 'string') el.value = state[k];
   });
@@ -5006,7 +5010,7 @@ function renderCard() {
     if (state.seriesIndex) {
       const sn = state.seriesName ? ` · ${esc(state.seriesName)}` : '';
       const st = state.seriesTotal ? ` / ${esc(state.seriesTotal)}` : '';
-      h += `<div class="series-badge">第 ${esc(state.seriesIndex)} 期${st}${sn}</div>`;
+      h += `<div class="series-badge">第 ${esc(state.seriesIndex)} ${esc(state.seriesUnit||'期')}${st}${sn}</div>`;
     }
     h += `<div class="cover-spacer"></div>`;
     if (page.coverDeco) h += `<div class="cover-deco">${esc(page.coverDeco)}</div>`;
@@ -5273,7 +5277,7 @@ els.authorToggle.addEventListener('click', () => { els.authorToggle.classList.to
 const _seriesToggle = document.getElementById('seriesToggle');
 const _seriesBody = document.getElementById('seriesBody');
 if (_seriesToggle && _seriesBody) _seriesToggle.addEventListener('click', () => { _seriesToggle.classList.toggle('open'); _seriesBody.classList.toggle('open'); });
-['seriesName','seriesIndex','seriesTotal','dataDate'].forEach(field => {
+['seriesName','seriesIndex','seriesTotal','seriesUnit','dataDate'].forEach(field => {
   const el = document.getElementById(field);
   if (el) el.addEventListener('input', () => { state[field] = el.value; _scheduleCardRender(); pushHistoryDebounced('编辑'+field); });
 });
