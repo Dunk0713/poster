@@ -2249,16 +2249,8 @@ function createPage(tpl = 'text') {
     greeting: '', dashDate: '', dashRange: '',
     fullImgCaption: '', fullImgFit: 'cover',
     heroValue: '', heroLabel: '',
-    tableHeaders: ['指标','基金A','基金B'],
-    tableRows: [['近1年收益','15.8%','12.3%'],['最大回撤','-8.2%','-11.5%']],
-    tableNote: '',
-    tableTitle: '',
-    tableStyle: '',
-    tableLayout: 'full',
-    numberColor: true,
-    highlightRows: [],
-    colAligns: [],
-    colWidths: [],
+    // dataCard 表格统一为一个 table 块对象（与 table 块同结构/同渲染/同编辑管线）
+    tableData: makeBlock('table'),
   };
 }
 
@@ -2966,7 +2958,7 @@ function _edBlockFields(blk, bi) {
       (blk.headers||[]).forEach((hd, ci) => {
         th += `<input class="form-input" id="b${bi}_h${ci}" value="${escAttr(hd||'')}" placeholder="列${ci+1}">`;
       });
-      th += `<button class="data-row-btn" onclick="App.tblAddCol(${bi})" title="加列">+</button>${cols>1?`<button class="data-row-btn danger" onclick="App.tblDelCol(${bi})" title="删列">−</button>`:''}`;
+      th += `<button class="data-row-btn" onclick="App.tblAddCol('${bi}')" title="加列">+</button>${cols>1?`<button class="data-row-btn danger" onclick="App.tblDelCol('${bi}')" title="删列">−</button>`:''}`;
       th += `</div>`;
       // 数据行
       (blk.rows||[]).forEach((row, ri) => {
@@ -2982,16 +2974,16 @@ function _edBlockFields(blk, bi) {
           th += `<div style="position:relative;flex:1;display:flex;flex-direction:column;gap:2px">
             <input class="form-input" id="b${bi}_c${ri}_${ci}" value="${escAttr(cell.text||'')}" placeholder="${ri+1}-${ci+1}">
             <div style="display:flex;gap:2px">
-              <button class="data-row-btn" onclick="App.tblMerge(${bi},${ri},${ci},'right')" title="向右合并" style="font-size:9px;padding:0 4px;height:18px">→${cs>1?'·'+cs:''}</button>
-              <button class="data-row-btn" onclick="App.tblMerge(${bi},${ri},${ci},'down')" title="向下合并" style="font-size:9px;padding:0 4px;height:18px">↓${rs>1?'·'+rs:''}</button>
-              ${merged?`<button class="data-row-btn danger" onclick="App.tblUnmerge(${bi},${ri},${ci})" title="拆分" style="font-size:9px;padding:0 4px;height:18px">⊟</button>`:''}
+              <button class="data-row-btn" onclick="App.tblMerge('${bi}',${ri},${ci},'right')" title="向右合并" style="font-size:9px;padding:0 4px;height:18px">→${cs>1?'·'+cs:''}</button>
+              <button class="data-row-btn" onclick="App.tblMerge('${bi}',${ri},${ci},'down')" title="向下合并" style="font-size:9px;padding:0 4px;height:18px">↓${rs>1?'·'+rs:''}</button>
+              ${merged?`<button class="data-row-btn danger" onclick="App.tblUnmerge('${bi}',${ri},${ci})" title="拆分" style="font-size:9px;padding:0 4px;height:18px">⊟</button>`:''}
             </div>
           </div>`;
         });
-        th += `<button class="row-hl-btn ${(blk.highlightRows||[]).includes(ri)?'active':''}" onclick="App.tblHl(${bi},${ri})" title="高亮此行">★</button>${rowCount>1?`<button class="data-row-btn danger" onclick="App.tblDelRow(${bi},${ri})" title="删行">×</button>`:''}`;
+        th += `<button class="row-hl-btn ${(blk.highlightRows||[]).includes(ri)?'active':''}" onclick="App.tblHl('${bi}',${ri})" title="高亮此行">★</button>${rowCount>1?`<button class="data-row-btn danger" onclick="App.tblDelRow('${bi}',${ri})" title="删行">×</button>`:''}`;
         th += `</div>`;
       });
-      th += `<button class="add-row-btn" onclick="App.tblAddRow(${bi})">+ 添加数据行</button>`;
+      th += `<button class="add-row-btn" onclick="App.tblAddRow('${bi}')">+ 添加数据行</button>`;
       // 列对齐
       while ((blk.colAligns||[]).length < (blk.headers||[]).length) blk.colAligns.push('');
       while ((blk.colWidths||[]).length < (blk.headers||[]).length) blk.colWidths.push('');
@@ -3315,94 +3307,18 @@ function renderEditorFields_raw() {
     h += _renderBlocksUI(page);
 
   } else if (page.template === 'dataCard') {
-    // Ensure colAligns/colWidths arrays match headers length
-    while ((page.colAligns||[]).length < page.tableHeaders.length) page.colAligns.push('');
-    while ((page.colWidths||[]).length < page.tableHeaders.length) page.colWidths.push('');
+    if (!page.tableData || typeof page.tableData !== 'object') page.tableData = makeBlock('table');
     h += `
       <div class="form-group" style="margin-top:12px">
-        <label class="form-label">核心数据</label>
+        <label class="form-label">核心数据（大字 + 标签，可选）</label>
         <div class="data-row">
           <input class="form-input" id="fHV" value="${escAttr(page.heroValue)}" placeholder="如 15.8%">
           <input class="form-input" id="fHL" value="${escAttr(page.heroLabel)}" placeholder="如 年化收益率">
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">表格标题（可选）</label>
-        <input class="form-input" id="fTableTitle" value="${escAttr(page.tableTitle)}" placeholder="如：基金对比数据">
-      </div>
-      <div class="form-group">
-        <label class="form-label">表格风格</label>
-        <div class="seg-row" id="tableStyleRow">
-          <button class="seg-btn ${!page.tableStyle?'active':''}" data-tst="">默认</button>
-          <button class="seg-btn ${page.tableStyle==='bordered'?'active':''}" data-tst="bordered">边框</button>
-          <button class="seg-btn ${page.tableStyle==='compact'?'active':''}" data-tst="compact">紧凑</button>
-          <button class="seg-btn ${page.tableStyle==='minimal'?'active':''}" data-tst="minimal">极简</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">表格布局</label>
-        <div class="seg-row" id="tableLayoutRow">
-          <button class="seg-btn ${!page.tableLayout||page.tableLayout==='full'?'active':''}" data-tl="full">撑满</button>
-          <button class="seg-btn ${page.tableLayout==='auto'?'active':''}" data-tl="auto">自适应居中</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
-          <span>数字颜色标识</span>
-          <button class="seg-btn ${page.numberColor?'active':''}" id="numColorToggle" style="padding:2px 8px;font-size:10px">
-            ${page.numberColor ? '✓ 开启' : '关闭'}
-          </button>
-        </label>
-        <div class="form-hint">自动识别正负数并标记颜色（正=红 负=绿，符合A股红涨绿跌）</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">表头</label>
-        <div class="data-row" id="headerRow">
-          ${page.tableHeaders.map((hd,i)=>`<input class="form-input" data-col="${i}" value="${escAttr(hd)}" placeholder="列${i+1}">`).join('')}
-          <button class="data-row-btn" onclick="addCol()">+</button>
-          ${page.tableHeaders.length>1?`<button class="data-row-btn danger" onclick="delCol()">−</button>`:''}
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">列对齐</label>
-        <div class="col-align-row" id="colAlignRow">
-          ${page.tableHeaders.map((hd,i)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
-            <span style="font-size:9px;color:#b0a090;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(hd)||'列'+(i+1)}</span>
-            <div style="display:flex;gap:1px">
-              <button class="col-align-btn ${!page.colAligns[i]?'active':''}" data-col="${i}" data-ca="">左</button>
-              <button class="col-align-btn ${page.colAligns[i]==='center'?'active':''}" data-col="${i}" data-ca="center">中</button>
-              <button class="col-align-btn ${page.colAligns[i]==='right'?'active':''}" data-col="${i}" data-ca="right">右</button>
-            </div>
-          </div>`).join('')}
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">列宽</label>
-        <div class="col-align-row" id="colWidthRow">
-          ${page.tableHeaders.map((hd,i)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
-            <span style="font-size:9px;color:#b0a090;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(hd)||'列'+(i+1)}</span>
-            <div style="display:flex;gap:1px">
-              <button class="col-align-btn ${page.colWidths[i]==='narrow'?'active':''}" data-col="${i}" data-cw="narrow">窄</button>
-              <button class="col-align-btn ${!page.colWidths[i]?'active':''}" data-col="${i}" data-cw="">自动</button>
-              <button class="col-align-btn ${page.colWidths[i]==='wide'?'active':''}" data-col="${i}" data-cw="wide">宽</button>
-            </div>
-          </div>`).join('')}
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">数据行 <span style="font-size:9px;color:#b0a090;font-weight:400">（★ = 高亮行）</span></label>
-        <div id="tableRowsEd">
-          ${page.tableRows.map((row,ri)=>`<div class="data-row">
-            <button class="row-hl-btn ${(page.highlightRows||[]).includes(ri)?'active':''}" data-ri="${ri}" title="高亮此行">★</button>
-            ${row.map((c,ci)=>`<input class="form-input" data-row="${ri}" data-col="${ci}" value="${escAttr(c)}" placeholder="数据">`).join('')}
-            <button class="data-row-btn danger" onclick="delRow(${ri})">×</button>
-          </div>`).join('')}
-        </div>
-        <button class="add-row-btn" onclick="addRow()">+ 添加数据行</button>
-      </div>
-      <div class="form-group">
-        <label class="form-label">备注说明 <span style="color:#b0a090;font-weight:400">（支持回车换行）</span></label>
-        <textarea class="form-textarea" id="fNote" rows="3" placeholder="数据来源、时间范围等&#10;按回车可换行">${escAttr(page.tableNote)}</textarea>
+        <label class="form-label">数据表格</label>
+        <div class="block-edit-body">${_edBlockFields(page.tableData, 'dc')}</div>
       </div>
     `;
     // 数据卡片页面也支持插入其他 block（在表格之后追加）
@@ -3522,6 +3438,27 @@ function migrateState(data) {
   data.pages = data.pages.map(p => {
     const merged = Object.assign(createPage((p && p.template) || 'text'), p || {});
     merged.blocks = Array.isArray(merged.blocks) ? merged.blocks.map(migrateBlock) : [];
+    // 旧版 dataCard：扁平 tableHeaders/tableRows(字符串数组) → 统一的 tableData(table 块对象)
+    if (p && Array.isArray(p.tableRows) && !p.tableData) {
+      const td = makeBlock('table');
+      td.headers = Array.isArray(p.tableHeaders) ? p.tableHeaders.slice() : td.headers;
+      td.rows = p.tableRows.map(r => (Array.isArray(r) ? r : []).map(c =>
+        (c && typeof c === 'object') ? c : { text: String(c == null ? '' : c) }));
+      td.title = p.tableTitle || '';
+      td.note = p.tableNote || '';
+      td.style = p.tableStyle || '';
+      td.tableLayout = p.tableLayout || 'full';
+      td.numberColor = p.numberColor !== false;
+      td.colAligns = Array.isArray(p.colAligns) ? p.colAligns.slice() : [];
+      td.colWidths = Array.isArray(p.colWidths) ? p.colWidths.slice() : [];
+      td.highlightRows = Array.isArray(p.highlightRows) ? p.highlightRows.slice() : [];
+      merged.tableData = td;
+    }
+    if (!merged.tableData || typeof merged.tableData !== 'object') merged.tableData = makeBlock('table');
+    merged.tableData = migrateBlock(merged.tableData);
+    // 清掉旧扁平字段，避免与 tableData 并存造成困惑
+    ['tableHeaders','tableRows','tableNote','tableTitle','tableStyle','tableLayout','numberColor','highlightRows','colAligns','colWidths']
+      .forEach(k => { delete merged[k]; });
     return merged;
   });
   if (typeof data.currentPageIndex !== 'number' || data.currentPageIndex < 0) data.currentPageIndex = 0;
@@ -3662,6 +3599,9 @@ function _walkBlockText(blk, fn) {
   if (Array.isArray(blk.images)) blk.images.forEach(im => { if (im && typeof im.label==='string') im.label = fn(im.label); });
   // panel 子块递归
   if (Array.isArray(blk.children)) blk.children.forEach(ch => _walkBlockText(ch, fn));
+  // table 块：表头 + 单元格文本（dataCard 的 tableData 同走此路径）
+  if (Array.isArray(blk.headers)) blk.headers = blk.headers.map(h => typeof h==='string' ? fn(h) : h);
+  if (Array.isArray(blk.rows)) blk.rows.forEach(r => { if (Array.isArray(r)) r.forEach(c => { if (c && typeof c.text==='string') c.text = fn(c.text); }); });
 }
 function findReplaceAll(needle, repl) {
   if (!needle) return 0;
@@ -3678,9 +3618,8 @@ function findReplaceAll(needle, repl) {
   ['authorName','authorTitle','footerCta','seriesName'].forEach(k => { if (state[k]) state[k] = fn(state[k]); });
   // 所有页所有块
   state.pages.forEach(p => {
-    ['category','title','subtitle','tableNote','heroValue','heroLabel'].forEach(k => { if (typeof p[k]==='string') p[k] = fn(p[k]); });
-    if (Array.isArray(p.tableHeaders)) p.tableHeaders = p.tableHeaders.map(fn);
-    if (Array.isArray(p.tableRows)) p.tableRows = p.tableRows.map(r => r.map(fn));
+    ['category','title','subtitle','heroValue','heroLabel'].forEach(k => { if (typeof p[k]==='string') p[k] = fn(p[k]); });
+    if (p.tableData) _walkBlockText(p.tableData, fn);
     (p.blocks||[]).forEach(blk => _walkBlockText(blk, fn));
   });
   return count;
@@ -3764,6 +3703,9 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// 表格目标解析：bi==='dc' → dataCard 页级 tableData；否则为 page.blocks[bi]
+function _tbl(bi) { return bi === 'dc' ? cp().tableData : cp().blocks[bi]; }
+
 // ====== Block Global Mutations (public API — exposed via window for inline onclick) ======
 const App = {
   undo: () => undo(),
@@ -3815,13 +3757,13 @@ const App = {
   movePanelChild(bi,ci,dir){ const ch=cp().blocks[bi].children; if(!ch)return; const ni=ci+dir; if(ni<0||ni>=ch.length)return; [ch[ci],ch[ni]]=[ch[ni],ch[ci]]; renderEditorFields(); renderCard(); pushHistory('移动子块'); },
   addPanelChildItem(bi,ci){ const ch=cp().blocks[bi].children; if(!ch||!ch[ci])return; const c=ch[ci]; c.items=c.items||[]; c.items.push(''); renderEditorFields(); renderCard(); },
   // ── Table block methods ──
-  tblAddRow(bi){ const b=cp().blocks[bi]; if(!b||b.type!=='table')return; pushHistory(); const cols=b.headers.length; b.rows.push(Array.from({length:cols},()=>({text:''}))); renderEditorFields(); renderCard(); },
-  tblDelRow(bi,ri){ const b=cp().blocks[bi]; if(!b||b.rows.length<=1)return; pushHistory('删行'); b.rows.splice(ri,1); b.highlightRows=(b.highlightRows||[]).filter(i=>i!==ri).map(i=>i>ri?i-1:i); renderEditorFields(); renderCard(); },
-  tblAddCol(bi){ const b=cp().blocks[bi]; if(!b||b.type!=='table')return; pushHistory(); b.headers.push(''); b.rows.forEach(r=>r.push({text:''})); (b.colAligns=b.colAligns||[]).push(''); (b.colWidths=b.colWidths||[]).push(''); renderEditorFields(); renderCard(); },
-  tblDelCol(bi){ const b=cp().blocks[bi]; if(!b||b.headers.length<=1)return; pushHistory('删列'); b.headers.pop(); b.rows.forEach(r=>r.pop()); (b.colAligns||[]).pop(); (b.colWidths||[]).pop(); renderEditorFields(); renderCard(); },
-  tblHl(bi,ri){ const b=cp().blocks[bi]; if(!b)return; b.highlightRows=b.highlightRows||[]; const i=b.highlightRows.indexOf(ri); if(i>=0) b.highlightRows.splice(i,1); else b.highlightRows.push(ri); renderEditorFields(); renderCard(); },
+  tblAddRow(bi){ const b=_tbl(bi); if(!b||b.type!=='table')return; pushHistory(); const cols=b.headers.length; b.rows.push(Array.from({length:cols},()=>({text:''}))); renderEditorFields(); renderCard(); },
+  tblDelRow(bi,ri){ const b=_tbl(bi); if(!b||b.rows.length<=1)return; pushHistory('删行'); b.rows.splice(ri,1); b.highlightRows=(b.highlightRows||[]).filter(i=>i!==ri).map(i=>i>ri?i-1:i); renderEditorFields(); renderCard(); },
+  tblAddCol(bi){ const b=_tbl(bi); if(!b||b.type!=='table')return; pushHistory(); b.headers.push(''); b.rows.forEach(r=>r.push({text:''})); (b.colAligns=b.colAligns||[]).push(''); (b.colWidths=b.colWidths||[]).push(''); renderEditorFields(); renderCard(); },
+  tblDelCol(bi){ const b=_tbl(bi); if(!b||b.headers.length<=1)return; pushHistory('删列'); b.headers.pop(); b.rows.forEach(r=>r.pop()); (b.colAligns||[]).pop(); (b.colWidths||[]).pop(); renderEditorFields(); renderCard(); },
+  tblHl(bi,ri){ const b=_tbl(bi); if(!b)return; b.highlightRows=b.highlightRows||[]; const i=b.highlightRows.indexOf(ri); if(i>=0) b.highlightRows.splice(i,1); else b.highlightRows.push(ri); renderEditorFields(); renderCard(); },
   tblMerge(bi,ri,ci,dir){
-    const b=cp().blocks[bi]; if(!b||b.type!=='table')return;
+    const b=_tbl(bi); if(!b||b.type!=='table')return;
     const cell=b.rows[ri][ci]; if(!cell)return;
     pushHistory('合并单元格');
     if (dir==='right') {
@@ -3836,7 +3778,7 @@ const App = {
     renderEditorFields(); renderCard();
   },
   tblUnmerge(bi,ri,ci){
-    const b=cp().blocks[bi]; if(!b)return;
+    const b=_tbl(bi); if(!b)return;
     const cell=b.rows[ri][ci]; if(!cell)return;
     pushHistory('拆分单元格');
     delete cell.rs; delete cell.cs;
@@ -3847,10 +3789,6 @@ const App = {
   addGalImg(bi)     { const blk=cp().blocks[bi]; if(blk.images.length<4){blk.images.push({src:'',label:''});renderEditorFields();renderCard();pushHistory('添加图片');} },
   delGalImg(bi,ii)  { const imgs=cp().blocks[bi].images; if(imgs.length<=1)return; imgs.splice(ii,1); renderEditorFields(); renderCard(); pushHistory('删除图片'); },
   delWrapImg(bi)     { cp().blocks[bi].src=''; renderEditorFields(); renderCard(); pushHistory('删除图片'); },
-  addCol()          { const p=cp(); p.tableHeaders.push(''); p.tableRows.forEach(r=>r.push('')); (p.colAligns=p.colAligns||[]).push(''); (p.colWidths=p.colWidths||[]).push(''); renderEditorFields(); renderCard(); pushHistory('添加列'); },
-  delCol()          { const p=cp(); if(p.tableHeaders.length<=1)return; p.tableHeaders.pop(); p.tableRows.forEach(r=>r.pop()); (p.colAligns||[]).pop(); (p.colWidths||[]).pop(); renderEditorFields(); renderCard(); pushHistory('删除列'); },
-  addRow()          { const p=cp(); p.tableRows.push(p.tableHeaders.map(()=>'')); renderEditorFields(); renderCard(); pushHistory('添加行'); },
-  delRow(ri)        { const p=cp(); if(p.tableRows.length<=1)return; p.tableRows.splice(ri,1); p.highlightRows=(p.highlightRows||[]).filter(i=>i!==ri).map(i=>i>ri?i-1:i); renderEditorFields(); renderCard(); pushHistory('删除行'); },
   splitOverflowPage() {
     const page = cp();
     if (!page.blocks || page.blocks.length < 2) { showToast('请手动新建页面并移动内容'); return; }
@@ -3872,6 +3810,64 @@ const _undoBtnEl = document.getElementById('undoBtn');
 if (_undoBtnEl) _undoBtnEl.addEventListener('click', (e) => { e.preventDefault(); undo(); });
 
 // ====== Bind Events ======
+// 表格编辑器事件绑定（table 块 与 dataCard 页级 tableData 共用，bi 可为数字或 'dc'）
+function _bindTableEditor(blk, bi, bind) {
+  const bnd = (sfx, obj, key) => bind(`b${bi}_${sfx}`, obj, key);
+  bnd('tt', blk, 'title', true);
+  bnd('n', blk, 'note', true);
+  // 表头输入
+  (blk.headers||[]).forEach((_,ci) => {
+    const el=document.getElementById(`b${bi}_h${ci}`);
+    if (el) el.addEventListener('input',()=>{ blk.headers[ci]=el.value; _scheduleCardRender(); });
+  });
+  // 单元格输入
+  (blk.rows||[]).forEach((row,ri) => {
+    row.forEach((_,ci) => {
+      const el=document.getElementById(`b${bi}_c${ri}_${ci}`);
+      if (el) el.addEventListener('input',()=>{ blk.rows[ri][ci].text=el.value; _scheduleCardRender(); });
+    });
+  });
+  // 风格切换
+  const sRow = document.getElementById(`tblStyle_${bi}`);
+  if (sRow) sRow.addEventListener('click', e => {
+    const btn = e.target.closest('.seg-btn'); if (!btn) return;
+    blk.style = btn.dataset.tst;
+    sRow.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tst === (blk.style||'')));
+    renderCard();
+  });
+  // 列对齐切换
+  const caRow = document.getElementById(`tblColAlign_${bi}`);
+  if (caRow) caRow.addEventListener('click', e => {
+    const btn = e.target.closest('.col-align-btn'); if (!btn) return;
+    const ci = parseInt(btn.dataset.col);
+    while (blk.colAligns.length <= ci) blk.colAligns.push('');
+    blk.colAligns[ci] = btn.dataset.ca;
+    caRow.querySelectorAll(`.col-align-btn[data-col="${ci}"]`).forEach(b => b.classList.toggle('active', b.dataset.ca === (blk.colAligns[ci]||'')));
+    renderCard();
+  });
+  // 列宽切换
+  const cwRow = document.getElementById(`tblColWidth_${bi}`);
+  if (cwRow) cwRow.addEventListener('click', e => {
+    const btn = e.target.closest('.col-align-btn'); if (!btn) return;
+    const ci = parseInt(btn.dataset.col);
+    while (blk.colWidths.length <= ci) blk.colWidths.push('');
+    blk.colWidths[ci] = btn.dataset.cw;
+    cwRow.querySelectorAll(`.col-align-btn[data-col="${ci}"]`).forEach(b => b.classList.toggle('active', b.dataset.cw === (blk.colWidths[ci]||'')));
+    renderCard();
+  });
+  // 数字色 checkbox
+  const ncEl = document.getElementById(`b${bi}_nc`);
+  if (ncEl) ncEl.addEventListener('change', () => { blk.numberColor = ncEl.checked; renderCard(); });
+  // 表格布局（撑满 / 自适应居中）
+  const tlRow = document.getElementById(`tblLayout_${bi}`);
+  if (tlRow) tlRow.addEventListener('click', e => {
+    const btn = e.target.closest('.seg-btn'); if (!btn) return;
+    blk.tableLayout = btn.dataset.tl;
+    tlRow.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tl === blk.tableLayout));
+    renderCard();
+  });
+}
+
 function bindEditorEvents() {
   const page = cp();
   // Smart bind: text-like inputs use debounced card render to avoid lag on every keystroke
@@ -3892,7 +3888,6 @@ function bindEditorEvents() {
   bind('fDashRange', page, 'dashRange', true);
   bind('fHV', page, 'heroValue', true);
   bind('fHL', page, 'heroLabel', true);
-  bind('fNote', page, 'tableNote', true);
   bind('fDeco', page, 'coverDeco', true);
   bind('fCTag', page, 'coverTag', true);
   bind('fFullCap', page, 'fullImgCaption', true);
@@ -4302,59 +4297,7 @@ function bindEditorEvents() {
       });
     }
     else if (blk.type === 'table') {
-      bnd('tt', blk, 'title', true);
-      bnd('n', blk, 'note', true);
-      // 表头输入
-      (blk.headers||[]).forEach((_,ci) => {
-        const el=document.getElementById(`b${bi}_h${ci}`);
-        if (el) el.addEventListener('input',()=>{ blk.headers[ci]=el.value; _scheduleCardRender(); });
-      });
-      // 单元格输入
-      (blk.rows||[]).forEach((row,ri) => {
-        row.forEach((_,ci) => {
-          const el=document.getElementById(`b${bi}_c${ri}_${ci}`);
-          if (el) el.addEventListener('input',()=>{ blk.rows[ri][ci].text=el.value; _scheduleCardRender(); });
-        });
-      });
-      // 风格切换
-      const sRow = document.getElementById(`tblStyle_${bi}`);
-      if (sRow) sRow.addEventListener('click', e => {
-        const btn = e.target.closest('.seg-btn'); if (!btn) return;
-        blk.style = btn.dataset.tst;
-        sRow.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tst === (blk.style||'')));
-        renderCard();
-      });
-      // 列对齐切换
-      const caRow = document.getElementById(`tblColAlign_${bi}`);
-      if (caRow) caRow.addEventListener('click', e => {
-        const btn = e.target.closest('.col-align-btn'); if (!btn) return;
-        const ci = parseInt(btn.dataset.col);
-        while (blk.colAligns.length <= ci) blk.colAligns.push('');
-        blk.colAligns[ci] = btn.dataset.ca;
-        caRow.querySelectorAll(`.col-align-btn[data-col="${ci}"]`).forEach(b => b.classList.toggle('active', b.dataset.ca === (blk.colAligns[ci]||'')));
-        renderCard();
-      });
-      // 列宽切换
-      const cwRow = document.getElementById(`tblColWidth_${bi}`);
-      if (cwRow) cwRow.addEventListener('click', e => {
-        const btn = e.target.closest('.col-align-btn'); if (!btn) return;
-        const ci = parseInt(btn.dataset.col);
-        while (blk.colWidths.length <= ci) blk.colWidths.push('');
-        blk.colWidths[ci] = btn.dataset.cw;
-        cwRow.querySelectorAll(`.col-align-btn[data-col="${ci}"]`).forEach(b => b.classList.toggle('active', b.dataset.cw === (blk.colWidths[ci]||'')));
-        renderCard();
-      });
-      // 数字色 checkbox
-      const ncEl = document.getElementById(`b${bi}_nc`);
-      if (ncEl) ncEl.addEventListener('change', () => { blk.numberColor = ncEl.checked; renderCard(); });
-      // 表格布局（撑满 / 自适应居中）
-      const tlRow = document.getElementById(`tblLayout_${bi}`);
-      if (tlRow) tlRow.addEventListener('click', e => {
-        const btn = e.target.closest('.seg-btn'); if (!btn) return;
-        blk.tableLayout = btn.dataset.tl;
-        tlRow.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tl === blk.tableLayout));
-        renderCard();
-      });
+      _bindTableEditor(blk, bi, bind);
     }
     else if (blk.type === 'tags') {
       blk.items.forEach((_,ii) => { const el=document.getElementById(`b${bi}_i${ii}`); if(el) el.addEventListener('input',()=>{blk.items[ii]=el.value;_scheduleCardRender();}); });
@@ -4525,54 +4468,10 @@ function bindEditorEvents() {
     }
   });
 
-  // Data card table
+  // Data card table：复用 table 块编辑器（数据=page.tableData，bi='dc'）
   if (page.template === 'dataCard') {
-    $$('#headerRow input').forEach(inp => inp.addEventListener('input', () => { page.tableHeaders[parseInt(inp.dataset.col)]=inp.value; _scheduleCardRender(); }));
-    $$('#tableRowsEd input').forEach(inp => inp.addEventListener('input', () => { page.tableRows[parseInt(inp.dataset.row)][parseInt(inp.dataset.col)]=inp.value; _scheduleCardRender(); }));
-    // Table style toggle
-    document.querySelectorAll('#tableStyleRow .seg-btn').forEach(btn => {
-      btn.addEventListener('click', () => { page.tableStyle = btn.dataset.tst; renderEditorFields(); renderCard(); });
-    });
-    // Table layout toggle (full / auto center)
-    document.querySelectorAll('#tableLayoutRow .seg-btn').forEach(btn => {
-      btn.addEventListener('click', () => { page.tableLayout = btn.dataset.tl; renderEditorFields(); renderCard(); });
-    });
-    // Number color toggle
-    const numColorToggle = document.getElementById('numColorToggle');
-    if (numColorToggle) {
-      numColorToggle.addEventListener('click', () => { page.numberColor = !page.numberColor; renderEditorFields(); renderCard(); });
-    }
-    // Table title input
-    const fTableTitle = document.getElementById('fTableTitle');
-    if (fTableTitle) fTableTitle.addEventListener('input', () => { page.tableTitle = fTableTitle.value; _scheduleCardRender(); });
-    // Column align buttons
-    $$('.col-align-btn[data-ca]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const ci = parseInt(btn.dataset.col);
-        while ((page.colAligns||[]).length < page.tableHeaders.length) page.colAligns.push('');
-        page.colAligns[ci] = btn.dataset.ca;
-        renderEditorFields(); renderCard();
-      });
-    });
-    // Column width buttons
-    $$('.col-align-btn[data-cw]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const ci = parseInt(btn.dataset.col);
-        while ((page.colWidths||[]).length < page.tableHeaders.length) page.colWidths.push('');
-        page.colWidths[ci] = btn.dataset.cw;
-        renderEditorFields(); renderCard();
-      });
-    });
-    // Row highlight star buttons
-    $$('.row-hl-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const ri = parseInt(btn.dataset.ri);
-        if (!page.highlightRows) page.highlightRows = [];
-        const idx = page.highlightRows.indexOf(ri);
-        if (idx >= 0) page.highlightRows.splice(idx, 1); else page.highlightRows.push(ri);
-        renderEditorFields(); renderCard();
-      });
-    });
+    if (!page.tableData || typeof page.tableData !== 'object') page.tableData = makeBlock('table');
+    _bindTableEditor(page.tableData, 'dc', bind);
   }
 }
 
@@ -5111,58 +5010,9 @@ function renderCard() {
     if (page.heroValue || page.heroLabel) {
       h += `<div class="card-hero-keystat">${page.heroValue?`<div class="card-hero-value">${esc(page.heroValue)}</div>`:''}${page.heroLabel?`<div class="card-hero-label">${esc(page.heroLabel)}</div>`:''}</div>`;
     }
-    // Build table with full style/align/width/color/highlight support
-    const tblCls = ['card-table'];
-    if (page.tableStyle === 'bordered') tblCls.push('table-bordered');
-    else if (page.tableStyle === 'compact') tblCls.push('table-compact');
-    else if (page.tableStyle === 'minimal') tblCls.push('table-minimal');
-    const dcAutoLayout = page.tableLayout === 'auto';
-    if (dcAutoLayout) tblCls.push('table-auto');
-    const alignMap = { left:'', center:'cell-center', right:'cell-right' };
-    const widthMap = { narrow:'col-narrow', wide:'col-wide' };
-    const numPat = /^[-+]?(\d+\.?\d*|\.\d+)(%?)$/;
-    const hlRows = page.highlightRows || [];
-    let tbl = dcAutoLayout ? `<div class="cb-table-wrap">` : '';
-    tbl += `<table class="${tblCls.join(' ')}">`;
-    if (page.tableTitle) tbl += `<caption>${esc(page.tableTitle)}</caption>`;
-    // Header row
-    tbl += `<thead><tr>`;
-    page.tableHeaders.forEach((hd, ci) => {
-      const ca = (page.colAligns||[])[ci] || '';
-      const cw = (page.colWidths||[])[ci] || '';
-      const caCls = alignMap[ca] ? ` ${alignMap[ca]}` : '';
-      const cwCls = widthMap[cw] ? ` ${widthMap[cw]}` : '';
-      tbl += `<th class="${caCls}${cwCls}">${esc(hd)}</th>`;
-    });
-    tbl += `</tr></thead><tbody>`;
-    // Data rows
-    page.tableRows.forEach((row, ri) => {
-      const isHl = hlRows.includes(ri);
-      tbl += `<tr${isHl?' class="row-highlight"':''}>`;
-      row.forEach((c, ci) => {
-        let cellCls = '';
-        const ca = (page.colAligns||[])[ci] || '';
-        if (alignMap[ca]) cellCls += ' ' + alignMap[ca];
-        if (isHl) cellCls += ' cell-bold';
-        let cellHtml;
-        if (page.numberColor && numPat.test(c)) {
-          const num = parseFloat(c);
-          const suffix = c.match(/(%?)$/)[1];
-          if (num > 0) { cellCls += ' num-pos'; }
-          else if (num < 0) { cellCls += ' num-neg'; }
-          else { cellCls += ' num-zero'; }
-          cellHtml = esc(c);
-        } else {
-          cellHtml = inl(c);
-        }
-        tbl += `<td class="${cellCls}">${cellHtml}</td>`;
-      });
-      tbl += `</tr>`;
-    });
-    tbl += `</tbody></table>`;
-    if (dcAutoLayout) tbl += `</div>`;
-    h += tbl;
-    if (page.tableNote) h += `<div style="font-size:24px;color:var(--sub);line-height:1.7;margin-top:4px">${inl(page.tableNote)}</div>`;
+    // 统一走 table 块渲染管线（支持合并单元格/风格/对齐/列宽/高亮/A股色，单处维护）
+    if (!page.tableData || typeof page.tableData !== 'object') page.tableData = makeBlock('table');
+    h += renderBlock(page.tableData, sz);
     // 数据卡片页也支持插入其他 block（在表格之后）
     for (const blk of page.blocks) h += renderBlock(blk, sz);
   }
