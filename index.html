@@ -1653,6 +1653,17 @@ body {
 .cb-quote.rh-breath { padding: var(--space-7) var(--space-7); }
 .cb-quote.rh-tight { padding: var(--space-5) var(--space-6); }
 
+/* ── 单块对齐 + 最大宽度（3.2：加法，默认不设=原行为） ── */
+.bk-al-left { text-align: left; }
+.bk-al-center { text-align: center; }
+.bk-al-right { text-align: right; }
+.bk-mw-sm { max-width: 48%; }
+.bk-mw-md { max-width: 64%; }
+.bk-mw-lg { max-width: 82%; }
+.bk-mw-sm, .bk-mw-md, .bk-mw-lg { margin-left: 0; margin-right: auto; }
+.bk-al-center.bk-mw-sm, .bk-al-center.bk-mw-md, .bk-al-center.bk-mw-lg { margin-left: auto; margin-right: auto; }
+.bk-al-right.bk-mw-sm, .bk-al-right.bk-mw-md, .bk-al-right.bk-mw-lg { margin-left: auto; margin-right: 0; }
+
 /* ── Line-height variants ── */
 .lh-tight, .lh-tight li, .lh-tight .mod-text, .lh-tight .q-text,
 .lh-tight .ic-desc, .lh-tight .gi-text { line-height: 1.35 !important; }
@@ -2149,7 +2160,7 @@ const BLOCK_COLORS = [
 
 function makeBlock(type) {
   // 1.6：canonical 排版字段只保留 rhythm + fontWeight（旧 spacing/lineHeight 由 migrateBlock 收敛后删除）
-  const base = { customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '' };
+  const base = { customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '', align: '', maxW: '' };
   switch(type) {
     case 'text':      return { ...base, type, content: '' };
     case 'bullets':   return { ...base, type, items: [''] };
@@ -2681,6 +2692,20 @@ function _edBlockToolbar(blk, bi) {
       <button class="${blkTexture(blk)==='air'?'active':''}" data-btx="air">轻盈</button>
       <button class="${blkTexture(blk)===''?'active':''}" data-btx="">平衡</button>
       <button class="${blkTexture(blk)==='solid'?'active':''}" data-btx="solid">紧实</button>
+    </div>
+    <span class="bsb-label" style="margin-left:6px">对齐</span>
+    <div class="block-size-mini block-align-select" data-bi="${bi}">
+      <button class="${!blk.align?'active':''}" data-bal="">默认</button>
+      <button class="${blk.align==='left'?'active':''}" data-bal="left">左</button>
+      <button class="${blk.align==='center'?'active':''}" data-bal="center">居中</button>
+      <button class="${blk.align==='right'?'active':''}" data-bal="right">右</button>
+    </div>
+    <span class="bsb-label" style="margin-left:6px">宽度</span>
+    <div class="block-size-mini block-maxw-select" data-bi="${bi}">
+      <button class="${!blk.maxW?'active':''}" data-bmw="">满</button>
+      <button class="${blk.maxW==='lg'?'active':''}" data-bmw="lg">宽</button>
+      <button class="${blk.maxW==='md'?'active':''}" data-bmw="md">中</button>
+      <button class="${blk.maxW==='sm'?'active':''}" data-bmw="sm">窄</button>
     </div>
   </div>
   <button class="block-adv-toggle" id="advToggle_${bi}" data-adv-bi="${bi}">质感调节 ▶</button>
@@ -4140,6 +4165,22 @@ function bindEditorEvents() {
         renderCard();
       });
     });
+    // Per-block 对齐
+    document.querySelectorAll(`.block-align-select[data-bi="${bi}"] button`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        blk.align = btn.dataset.bal;
+        document.querySelectorAll(`.block-align-select[data-bi="${bi}"] button`).forEach(b => b.classList.toggle('active', b.dataset.bal === (blk.align||'')));
+        renderCard();
+      });
+    });
+    // Per-block 最大宽度
+    document.querySelectorAll(`.block-maxw-select[data-bi="${bi}"] button`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        blk.maxW = btn.dataset.bmw;
+        document.querySelectorAll(`.block-maxw-select[data-bi="${bi}"] button`).forEach(b => b.classList.toggle('active', b.dataset.bmw === (blk.maxW||'')));
+        renderCard();
+      });
+    });
     // Advanced options toggle
     const advToggle = document.getElementById(`advToggle_${bi}`);
     if (advToggle) {
@@ -4600,7 +4641,9 @@ function renderBlock(blk, sz) {
   // migrateBlock 全量收敛删除，所有入口[init/导入/恢复]均过 migrateState）
   const extraCls =
     (blk.rhythm ? ` rh-${blk.rhythm}` : '') +
-    (blk.fontWeight ? ` fw-${blk.fontWeight}` : '');
+    (blk.fontWeight ? ` fw-${blk.fontWeight}` : '') +
+    (blk.align ? ` bk-al-${blk.align}` : '') +
+    (blk.maxW ? ` bk-mw-${blk.maxW}` : '');
   const hasColorAttr = blk.customColor ? ' data-has-color' : '';
 
   switch (blk.type) {
