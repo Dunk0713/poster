@@ -2316,6 +2316,10 @@ const state = {
   _uiFolded: new Set(),
 };
 
+// 顶层字段的纯净默认快照（在 demo / 任何用户改动前捕获）。
+// 导入/恢复时以此为基底覆盖，避免"缺字段"的存档残留上一会话值。
+const _PRISTINE_STATE = (() => { const { _uiFolded, _ui, ...r } = state; return JSON.stringify(r); })();
+
 // ── Debounce & Focus Preservation utilities ──
 function _debounce(fn, delay) {
   let timer = null;
@@ -3534,7 +3538,10 @@ function migrateState(data) {
 function _applyState(data) {
   const m = migrateState(data);
   if (!m) return false;
-  Object.keys(m).forEach(k => { state[k] = m[k]; });
+  // 先以纯净默认为基底，再覆盖存档中实际存在的键 → 缺失字段回到默认而非残留
+  const base = JSON.parse(_PRISTINE_STATE);
+  Object.keys(base).forEach(k => { state[k] = (k in m) ? m[k] : base[k]; });
+  Object.keys(m).forEach(k => { if (!(k in base)) state[k] = m[k]; });
   state._uiFolded = new Set();
   return true;
 }
