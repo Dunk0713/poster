@@ -2104,11 +2104,10 @@ const BLOCK_TYPES = {
   numbered:  '编号列表',
   checklist: '清单',
   highlight: '高亮模块',
-  quote:     '引用块',
+  quote:     '引用 / 金句',
   infocard:  '信息卡片',
   keystat:   '核心数据',
   herostat:  '巨型数字',
-  pullquote: '金句横幅',
   metric:    '指标·对比',
   ranking:   '排名列表',
   progress:  '进度环',
@@ -2170,11 +2169,11 @@ function makeBlock(type) {
     case 'bullets':   return { ...base, type, items: [''] };
     case 'numbered':  return { ...base, type, items: [''] };
     case 'highlight': return { ...base, type, label: '', content: '', labelSize: '', labelStyle: '' };
-    case 'quote':     return { ...base, type, content: '', source: '' };
+    case 'quote':     return { ...base, type, variant: '', content: '', source: '' };
     case 'infocard':  return { ...base, type, num: '', title: '', desc: '' };
     case 'keystat':   return { ...base, type, value: '', label: '' };
     case 'herostat':  return { ...base, type, value: '8.2%', label: '年化收益率', caption: '' };
-    case 'pullquote': return { ...base, type, text: '市场不会奖励正确，只会奖励耐心。', source: '彼得·林奇' };
+    case 'pullquote': return { ...base, type: 'quote', variant: 'featured', content: '市场不会奖励正确，只会奖励耐心。', source: '彼得·林奇' };
     case 'metric':    return { ...base, type, value: '8.2%', label: '年化收益', delta: '+12%', deltaDir: 'up', deltaLabel: 'vs 上月' };
     case 'ranking':   return { ...base, type, title: 'TOP 基金', items: [
       { name: '易方达蓝筹', value: '23.5%', pct: 100 },
@@ -2258,6 +2257,13 @@ function migrateBlock(blk) {
   }
   // Legacy fontWeight heavy → bold
   if (blk.fontWeight === 'heavy') blk.fontWeight = 'bold';
+  // ── 3.1 块合并：旧 type → 规范 type + variant（幂等；旧档渲染等价）──
+  if (blk.type === 'pullquote') {
+    blk.type = 'quote';
+    if (!blk.variant) blk.variant = 'featured';
+    if (!blk.content && blk.text) blk.content = blk.text;
+    delete blk.text;
+  }
   // 字段兜底（旧笔记打开不报错）
   if (blk.type === 'panel'  && !Array.isArray(blk.children)) blk.children = [];
   if (blk.type === 'tldr'   && !Array.isArray(blk.points))   blk.points = [''];
@@ -2813,8 +2819,12 @@ function _edBlockFields(blk, bi) {
         </div>
         <textarea class="form-textarea" id="b${bi}_c" rows="3" placeholder="内容 **加粗** ==强调色==">${escAttr(blk.content)}</textarea>`;
     case 'quote':
-      return `<textarea class="form-textarea" id="b${bi}_c" rows="3" placeholder="引用内容 **加粗** ==强调色==">${escAttr(blk.content)}</textarea>
-        <input class="form-input" id="b${bi}_s" value="${escAttr(blk.source)}" placeholder="来源（可选）" style="margin-top:6px">`;
+      return `<div class="seg-row" id="qv_${bi}">
+          <button class="seg-btn ${!blk.variant?'active':''}" data-qv="">普通引用</button>
+          <button class="seg-btn ${blk.variant==='featured'?'active':''}" data-qv="featured">金句横幅</button>
+        </div>
+        <textarea class="form-textarea" id="b${bi}_c" rows="3" placeholder="引用内容 **加粗** ==强调色==" style="margin-top:6px">${escAttr(blk.content||'')}</textarea>
+        <input class="form-input" id="b${bi}_s" value="${escAttr(blk.source||'')}" placeholder="${blk.variant==='featured'?'出处':'来源'}（可选）" style="margin-top:6px">`;
     case 'infocard':
       return `<div class="data-row">
         <input class="form-input" id="b${bi}_n" value="${escAttr(blk.num)}" placeholder="编号 如 01">
@@ -2832,9 +2842,6 @@ function _edBlockFields(blk, bi) {
         <input class="form-input" id="b${bi}_l" value="${escAttr(blk.label)}" placeholder="标签 如 近三年累计收益">
       </div>
       <input class="form-input" id="b${bi}_cap" value="${escAttr(blk.caption||'')}" placeholder="说明文字（可选）" style="margin-top:6px">`;
-    case 'pullquote':
-      return `<textarea class="form-textarea" id="b${bi}_t" rows="3" placeholder="引文正文 **加粗** ==强调色==">${escAttr(blk.text||'')}</textarea>
-        <input class="form-input" id="b${bi}_s" value="${escAttr(blk.source||'')}" placeholder="出处（可选）" style="margin-top:6px">`;
     case 'metric':
       return `<div class="data-row">
         <input class="form-input" id="b${bi}_v" value="${escAttr(blk.value||'')}" placeholder="数值 如 8.2%">
@@ -3284,7 +3291,7 @@ function _renderBlocksUI(page) {
   });
   h += `</div>`;
   const BLOCK_GROUPS = [
-    { label: '文本', types: ['text','bullets','numbered','checklist','highlight','callout','quote','pullquote','infocard','sectionHeader'] },
+    { label: '文本', types: ['text','bullets','numbered','checklist','highlight','callout','quote','infocard','sectionHeader'] },
     { label: '数据', types: ['keystat','herostat','metric','compare','kpigrid','ranking','progress','sparkcard','table'] },
     { label: '视觉', types: ['image','gallery','textWrap','tags','qrcode'] },
     { label: '版式', types: ['tldr','panel','grid','divider','source','disclaimer'] },
@@ -4234,11 +4241,19 @@ function bindEditorEvents() {
         });
       });
     }
-    else if (blk.type === 'quote')     { bnd('c',blk,'content',true); bnd('s',blk,'source',true); }
+    else if (blk.type === 'quote')     {
+      bnd('c',blk,'content',true); bnd('s',blk,'source',true);
+      const qv=document.getElementById(`qv_${bi}`);
+      if (qv) qv.addEventListener('click', e => {
+        const b=e.target.closest('.seg-btn'); if(!b)return;
+        blk.variant=b.dataset.qv;
+        qv.querySelectorAll('.seg-btn').forEach(x=>x.classList.toggle('active',x.dataset.qv===(blk.variant||'')));
+        renderEditorFields(); renderCard();
+      });
+    }
     else if (blk.type === 'infocard')  { bnd('n',blk,'num',true); bnd('t',blk,'title',true); bnd('d',blk,'desc',true); }
     else if (blk.type === 'keystat')   { bnd('v',blk,'value',true); bnd('l',blk,'label',true); }
     else if (blk.type === 'herostat')  { bnd('v',blk,'value',true); bnd('l',blk,'label',true); bnd('cap',blk,'caption',true); }
-    else if (blk.type === 'pullquote') { bnd('t',blk,'text',true); bnd('s',blk,'source',true); }
     else if (blk.type === 'metric') {
       bnd('v',blk,'value',true); bnd('l',blk,'label',true); bnd('d',blk,'delta',true); bnd('dl',blk,'deltaLabel',true);
       document.querySelectorAll(`#metricDirRow_${bi} [data-mdir]`).forEach(btn => {
@@ -4678,6 +4693,8 @@ function renderBlock(blk, sz) {
       return `<div class="cb-highlight${bsCls}${extraCls}${labelStyleCls}"${hasColorAttr}${wrapStyle}>${blk.label?`<div class="mod-label${labelSzCls}">${esc(blk.label)}</div>`:''}<div class="mod-text ${effectiveSz}">${parseBody(blk.content)}</div></div>`;
     }
     case 'quote':
+      if (blk.variant === 'featured')
+        return `<div class="cb-pullquote${extraCls}"${wrapStyle}><div class="pq-text">${inl(blk.content||'')}</div>${blk.source?`<div class="pq-source">${esc(blk.source)}</div>`:''}</div>`;
       return `<div class="cb-quote${bsCls}${extraCls}"${hasColorAttr}${wrapStyle}><div class="q-text ${effectiveSz}">${parseBody(blk.content)}</div>${blk.source?`<div class="q-source">— ${esc(blk.source)}</div>`:''}</div>`;
     case 'infocard':
       return `<div class="cb-infocard${bsCls}${extraCls}"${wrapStyle}>${blk.num?`<div class="ic-num">${esc(blk.num)}</div>`:''}${blk.title?`<div class="ic-title ${effectiveSz}">${esc(blk.title)}</div>`:''}${blk.desc?`<div class="ic-desc ${effectiveSz}">${parseBody(blk.desc)}</div>`:''}</div>`;
@@ -4685,8 +4702,6 @@ function renderBlock(blk, sz) {
       return `<div class="cb-keystat ${effectiveSz}${bsCls}${extraCls}"${wrapStyle}>${blk.value?`<div class="ks-value">${esc(blk.value)}</div>`:''}${blk.label?`<div class="ks-label">${esc(blk.label)}</div>`:''}</div>`;
     case 'herostat':
       return `<div class="cb-herostat${extraCls}"${wrapStyle}>${blk.value?`<div class="hs-value">${esc(blk.value)}</div>`:''}<div class="hs-sep"></div>${blk.label?`<div class="hs-label">${esc(blk.label)}</div>`:''}${blk.caption?`<div class="hs-caption">${inl(blk.caption)}</div>`:''}</div>`;
-    case 'pullquote':
-      return `<div class="cb-pullquote${extraCls}"${wrapStyle}><div class="pq-text">${inl(blk.text||'')}</div>${blk.source?`<div class="pq-source">${esc(blk.source)}</div>`:''}</div>`;
     case 'metric': {
       const dir = blk.deltaDir || 'up';
       const szCls = effectiveSz ? ` ${effectiveSz}` : '';
