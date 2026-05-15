@@ -1664,6 +1664,11 @@ body {
 .bk-al-center.bk-mw-sm, .bk-al-center.bk-mw-md, .bk-al-center.bk-mw-lg { margin-left: auto; margin-right: auto; }
 .bk-al-right.bk-mw-sm, .bk-al-right.bk-mw-md, .bk-al-right.bk-mw-lg { margin-left: auto; margin-right: 0; }
 
+/* ── 3.2-D 块并排行容器 ── */
+.cb-row { display: flex; gap: var(--space-6); align-items: stretch; margin-bottom: var(--space-block); }
+.cb-row .cb-rowcell { flex: 1 1 0; min-width: 0; }
+.cb-row .cb-rowcell > * { margin-bottom: 0 !important; height: 100%; }
+
 /* ── Line-height variants ── */
 .lh-tight, .lh-tight li, .lh-tight .mod-text, .lh-tight .q-text,
 .lh-tight .ic-desc, .lh-tight .gi-text { line-height: 1.35 !important; }
@@ -2164,7 +2169,7 @@ const BLOCK_COLORS = [
 
 function makeBlock(type) {
   // 1.6：canonical 排版字段只保留 rhythm + fontWeight（旧 spacing/lineHeight 由 migrateBlock 收敛后删除）
-  const base = { customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '', align: '', maxW: '' };
+  const base = { customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '', align: '', maxW: '', col: '' };
   switch(type) {
     case 'text':      return { ...base, type, content: '' };
     case 'bullets':   return { ...base, type, items: [''] };
@@ -2742,7 +2747,11 @@ function _edBlockToolbar(blk, bi) {
       <button class="${blk.maxW==='md'?'active':''}" data-bmw="md">中</button>
       <button class="${blk.maxW==='sm'?'active':''}" data-bmw="sm">窄</button>
     </div>
-  </div>
+    <span class="bsb-label" style="margin-left:6px">并排</span>
+    <div class="block-size-mini block-col-select" data-bi="${bi}">
+      <button class="${!blk.col?'active':''}" data-bcol="">独占</button>
+      <button class="${blk.col?'active':''}" data-bcol="2">与相邻并排</button>
+    </div>
   <button class="block-adv-toggle" id="advToggle_${bi}" data-adv-bi="${bi}">质感调节 ▶</button>
 </div>`;}
 
@@ -4220,6 +4229,14 @@ function bindEditorEvents() {
         renderCard();
       });
     });
+    // Per-block 并排
+    document.querySelectorAll(`.block-col-select[data-bi="${bi}"] button`).forEach(btn => {
+      btn.addEventListener('click', () => {
+        blk.col = btn.dataset.bcol;
+        document.querySelectorAll(`.block-col-select[data-bi="${bi}"] button`).forEach(b => b.classList.toggle('active', b.dataset.bcol === (blk.col||'')));
+        renderCard();
+      });
+    });
     // Advanced options toggle
     const advToggle = document.getElementById(`advToggle_${bi}`);
     if (advToggle) {
@@ -5003,6 +5020,27 @@ function renderBlock(blk, sz) {
 }
 
 // ====== Render: Card ======
+// 3.2-D 块并排：连续 col 非空的块包进一个 flex 行容器，等分排布
+function renderBlockSeq(blocks, sz) {
+  let out = '', i = 0;
+  const bs = blocks || [];
+  while (i < bs.length) {
+    const b = bs[i];
+    if (b && b.col) {
+      let row = '<div class="cb-row">';
+      while (i < bs.length && bs[i] && bs[i].col) {
+        row += `<div class="cb-rowcell">${renderBlock(bs[i], sz)}</div>`;
+        i++;
+      }
+      out += row + '</div>';
+    } else {
+      out += renderBlock(b, sz);
+      i++;
+    }
+  }
+  return out;
+}
+
 function renderCard() {
   const page = cp();
   const szMap = { 'xs':'sz-xs', 'small':'sz-s', 'ms':'sz-ms', 'medium':'', 'ml':'sz-ml', 'large':'sz-l', 'xl':'sz-xl' };
@@ -5125,7 +5163,7 @@ function renderCard() {
       }
       if (page.subtitle) rightCol += `<div class="card-subtitle ${sz} ${ta}">${esc(page.subtitle)}</div>`;
       rightCol += `<div class="card-body">`;
-      for (const blk of page.blocks) rightCol += renderBlock(blk, sz);
+      rightCol += renderBlockSeq(page.blocks, sz);
       rightCol += `</div>`;
       // Footer inside right column
       const _ftHide = state.footerStyle === 'hide';
@@ -5156,7 +5194,7 @@ function renderCard() {
         h += `</div>`;
       }
       h += `<div class="card-body">`;
-      for (const blk of page.blocks) h += renderBlock(blk, sz);
+      h += renderBlockSeq(page.blocks, sz);
       h += `</div>`;
     }
   } else if (page.template === 'dashboard') {
@@ -5171,7 +5209,7 @@ function renderCard() {
         ${page.dashRange?`<span class="dh-range">${esc(page.dashRange)}</span>`:''}
       </div>
     </div>`;
-    for (const blk of page.blocks) h += renderBlock(blk, sz);
+    h += renderBlockSeq(page.blocks, sz);
   } else if (page.template === 'dataCard') {
     if (page.heroValue || page.heroLabel) {
       h += `<div class="card-hero-keystat">${page.heroValue?`<div class="card-hero-value">${esc(page.heroValue)}</div>`:''}${page.heroLabel?`<div class="card-hero-label">${esc(page.heroLabel)}</div>`:''}</div>`;
@@ -5180,7 +5218,7 @@ function renderCard() {
     if (!page.tableData || typeof page.tableData !== 'object') page.tableData = makeBlock('table');
     h += renderBlock(page.tableData, sz);
     // 数据卡片页也支持插入其他 block（在表格之后）
-    for (const blk of page.blocks) h += renderBlock(blk, sz);
+    h += renderBlockSeq(page.blocks, sz);
   }
 
   // Footer (skip for split layout – already included inside right column)
