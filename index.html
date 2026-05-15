@@ -1785,7 +1785,7 @@ body {
 .card.theme-navy .cb-stat-compare { background: rgba(245,236,214,0.05); }
 
 /* ── Image gallery block (多图组合) ── */
-.cb-gallery { display: grid; gap: 12px; margin-bottom: 24px; border-radius: 16px; overflow: hidden; }
+.cb-gallery { display: grid; gap: 18px; margin-bottom: 24px; border-radius: 16px; overflow: hidden; }
 .cb-gallery.gal-2 { grid-template-columns: 1fr 1fr; }
 .cb-gallery.gal-3 { grid-template-columns: 1fr 1fr 1fr; }
 .cb-gallery.gal-2x2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
@@ -4070,13 +4070,13 @@ function bindEditorEvents() {
   if (mainDrop && mainInput) {
     mainDrop.addEventListener('click', e => { if(!e.target.classList.contains('remove-img')) mainInput.click(); });
     mainInput.addEventListener('change', e => {
-      if(e.target.files[0]) readFile(e.target.files[0], d => { page.image=d; renderEditorFields(); renderCard(); });
+      if(e.target.files[0]) readFile(e.target.files[0], d => { page.image=d; renderEditorFields(); renderCard(); _autoFit(d, fit => { if(page.imageFit!==fit){ page.imageFit=fit; renderEditorFields(); renderCard(); } }); });
     });
     mainDrop.addEventListener('dragover', e => { e.preventDefault(); mainDrop.style.borderColor='#c4673a'; });
     mainDrop.addEventListener('dragleave', () => { mainDrop.style.borderColor=''; });
     mainDrop.addEventListener('drop', e => {
       e.preventDefault(); mainDrop.style.borderColor='';
-      if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0], d => { page.image=d; renderEditorFields(); renderCard(); });
+      if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0], d => { page.image=d; renderEditorFields(); renderCard(); _autoFit(d, fit => { if(page.imageFit!==fit){ page.imageFit=fit; renderEditorFields(); renderCard(); } }); });
     });
   }
 
@@ -4498,6 +4498,20 @@ function bindEditorEvents() {
 }
 
 // ====== Portrait image detection ======
+// 上传图片时按宽高比智能选默认适配：竖版卡片下竖图/近方图用 cover 充满、
+// 横图用 contain 完整展示（避免裁掉关键内容）。用户仍可手动切换。
+function _autoFit(dataUrl, cb) {
+  if (!dataUrl) return;
+  const im = new Image();
+  im.onload = () => {
+    if (!im.naturalWidth || !im.naturalHeight) return;
+    const ratio = im.naturalHeight / im.naturalWidth; // >1 竖图，<1 横图
+    cb(ratio >= 0.8 ? 'cover' : 'contain');
+  };
+  im.onerror = () => {};
+  im.src = dataUrl;
+}
+
 function detectPortraitImages() {
   els.cardContent.querySelectorAll('.card-image-area img, .cb-image img').forEach(img => {
     const apply = () => {
