@@ -1,0 +1,15 @@
+# 本地工具与设置（不纳入版本控制）
+.claude/settings.local.json
+.workbuddy/
+node_modules/
+
+# 操作系统垃圾文件
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 临时/导出产物
+*.tmp
+笔记-*.png
+长图-*.png
+小红书笔记存档-*.json
