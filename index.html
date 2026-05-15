@@ -740,8 +740,9 @@ body {
 
 /* ── Block: Text ── */
 .cb-text { font-size: var(--fs-body); line-height: var(--lh-loose); color: var(--body); letter-spacing: 0; margin-bottom: var(--space-6); }
-.cb-text.sz-s { font-size: 30px; }
-.cb-text.sz-l { font-size: var(--fs-lg); }
+/* sz-* 相对 --fs-body（mood 会覆盖 --fs-body）→ 不同气质下大小档一致跟随 */
+.cb-text.sz-s { font-size: calc(var(--fs-body) * 0.84); }
+.cb-text.sz-l { font-size: calc(var(--fs-body) * 1.28); }
 .cb-text p { margin-bottom: var(--space-4); }
 .cb-text p:last-child { margin-bottom: 0; }
 .cb-text strong { font-weight: 700; color: var(--title); }
@@ -749,8 +750,8 @@ body {
 
 /* ── Block: Bullets ── */
 .cb-bullets { list-style: none; padding: 0; margin-bottom: var(--space-6); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--body); }
-.cb-bullets.sz-s { font-size: 30px; }
-.cb-bullets.sz-l { font-size: var(--fs-lg); }
+.cb-bullets.sz-s { font-size: calc(var(--fs-body) * 0.84); }
+.cb-bullets.sz-l { font-size: calc(var(--fs-body) * 1.28); }
 .cb-bullets li { display: flex; align-items: flex-start; gap: 20px; margin-bottom: var(--space-3); }
 .cb-bullets li::before {
   content: ''; flex-shrink: 0;
@@ -768,8 +769,8 @@ body {
   display: flex; gap: 20px; align-items: flex-start; margin-bottom: var(--space-3);
   font-size: var(--fs-body); color: var(--body); line-height: var(--lh-body);
 }
-.cb-numbered.sz-s li { font-size: 30px; }
-.cb-numbered.sz-l li { font-size: var(--fs-lg); }
+.cb-numbered.sz-s li { font-size: calc(var(--fs-body) * 0.84); }
+.cb-numbered.sz-l li { font-size: calc(var(--fs-body) * 1.28); }
 .cb-numbered li .n {
   min-width: 52px; height: 52px; border-radius: 50%;
   background: var(--accent); color: #fff;
