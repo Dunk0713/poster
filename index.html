@@ -424,6 +424,8 @@ body {
   --space-9:72px; --space-10:96px;
   --radius-sm:10px; --radius-md:16px; --radius-lg:24px; --radius-xl:32px;
   --bg-angle:170deg;
+  /* 涨跌语义色（A股红涨绿跌默认值；深色主题下覆盖为高对比亮色） */
+  --pos:#d63031; --neg:#1e8a3e;
   --accent-s:rgba(0,0,0,0.28);  /* overridden per theme */
   /* 字体系统：默认（系统无衬线）。各 mood 同时覆盖标题字体与正文字体以保持风格统一 */
   --font-base: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB", sans-serif;
@@ -595,11 +597,11 @@ body {
   --line:rgba(0,0,0,0.10); --mod:rgba(255,255,255,0.85); --shad:rgba(82,40,20,0.08);
   --pill-bg:rgba(224,64,160,0.10); --pill-text:#c03080;
 }
+/* 收掉 6 色阶"模板感"长虹，改为与高级主题一致的柔和双径向洗色（保留彩色个性） */
 .card.theme-rainbow .card-bg {
-  background: linear-gradient(135deg,
-    rgba(255,107,107,0.12) 0%, rgba(255,169,77,0.10) 20%,
-    rgba(255,212,59,0.08) 40%, rgba(105,219,124,0.10) 60%,
-    rgba(77,171,247,0.12) 80%, rgba(151,117,250,0.12) 100%),
+  background:
+    radial-gradient(ellipse at 16% 12%, rgba(224,64,160,0.10) 0%, transparent 56%),
+    radial-gradient(ellipse at 86% 88%, rgba(99,102,241,0.10) 0%, transparent 56%),
     linear-gradient(var(--bg-angle), var(--bg1) 0%, var(--bg2) 100%) !important;
 }
 .card.theme-midnight {
@@ -633,9 +635,8 @@ body {
 .card.theme-navy .cb-highlight .mod-text strong,
 .card.theme-navy .cb-text strong { color: #f5ecd6; }
 .card.theme-navy .palette-swatch.active::after { color: #0b1d3a; }
-/* Navy × dashboard: elevate gold-chip delta, give numbers a warm ivory sheen — A股涨红跌绿 */
-.card.theme-navy .cb-delta.dir-up { color: #ff7b7b; }
-.card.theme-navy .cb-delta.dir-down { color: #6ee0a4; }
+/* 深色主题：涨跌色提亮以保证对比与协调（统一走 --pos/--neg 令牌） */
+.card.theme-dark, .card.theme-midnight, .card.theme-navy { --pos:#ff7b7b; --neg:#6ee0a4; }
 .card.theme-navy.template-dashboard .cb-metric,
 .card.theme-navy.template-dashboard .cb-ranking,
 .card.theme-navy.template-dashboard .cb-sparkcard,
@@ -966,9 +967,9 @@ body {
 
 /* ── Delta (up/down/flat indicator) — A股配色：涨红跌绿 ── */
 .cb-delta { font-size: var(--fs-micro); font-weight: 650; letter-spacing: 0.02em; display: inline-block; }
-.cb-delta.dir-up   { color: #c23c3c; }
+.cb-delta.dir-up   { color: var(--pos); }
 .cb-delta.dir-up::before   { content: '▲ '; font-size: 0.85em; }
-.cb-delta.dir-down { color: #2e8f4e; }
+.cb-delta.dir-down { color: var(--neg); }
 .cb-delta.dir-down::before { content: '▼ '; font-size: 0.85em; }
 .cb-delta.dir-flat { color: var(--sub); }
 .cb-delta.dir-flat::before { content: '— '; opacity: 0.6; }
@@ -1778,8 +1779,8 @@ body {
   box-shadow: 0 2px 8px var(--accent-l);
 }
 /* A股配色：正值红、负值绿 */
-.cb-stat-compare .sc-chip.chip-pos { background: #d63031; box-shadow: 0 2px 8px rgba(214,48,49,0.25); color: #fff; }
-.cb-stat-compare .sc-chip.chip-neg { background: #2e8f4e; box-shadow: 0 2px 8px rgba(46,143,78,0.25); color: #fff; }
+.cb-stat-compare .sc-chip.chip-pos { background: var(--pos); box-shadow: 0 2px 8px rgba(0,0,0,0.12); color: #fff; }
+.cb-stat-compare .sc-chip.chip-neg { background: var(--neg); box-shadow: 0 2px 8px rgba(0,0,0,0.12); color: #fff; }
 .card.theme-navy .cb-stat-compare .sc-chip { color: #fff; }
 .card.theme-navy .cb-stat-compare .sc-chip:not(.chip-pos):not(.chip-neg) { color: #2a1d04; }
 .card.theme-navy .cb-stat-compare { background: rgba(245,236,214,0.05); }
@@ -1861,8 +1862,8 @@ body {
 .card-table.table-minimal tr:last-child td { border-bottom: 1px solid var(--line); }
 .card-table .row-highlight td { background: var(--accent-l) !important; font-weight: 600; }
 /* 表格数字颜色：A股红涨绿跌 */
-.card-table .num-pos { color: #d63031; font-weight: 600; }
-.card-table .num-neg { color: #1e8a3e; font-weight: 600; }
+.card-table .num-pos { color: var(--pos); font-weight: 600; }
+.card-table .num-neg { color: var(--neg); font-weight: 600; }
 .card-table .num-zero { color: var(--sub); }
 .card-table .cell-right { text-align: right; font-variant-numeric: tabular-nums; }
 .card-table .cell-center { text-align: center; }
