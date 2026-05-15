@@ -2112,8 +2112,7 @@ const BLOCK_TYPES = {
   kpigrid:   'KPI 网格',
   sparkcard: '走势卡',
   callout:   '语义卡片',
-  tldr:      '一图速览',
-  source:    '数据来源',
+  tldr:      '速览 / 来源',
   panel:     '嵌套面板',
   tags:      '标签组',
   grid:      '双列卡片',
@@ -2187,8 +2186,8 @@ function makeBlock(type) {
     case 'sparkcard': return { ...base, type, title: '净值走势', value: '1.2456', delta: '+0.8%', deltaDir: 'up', values: '1.12,1.15,1.14,1.18,1.22,1.20,1.24,1.2456' };
     case 'compare':   return { ...base, type: 'keystat', variant: 'compare', label: '中欧沪深300指数量化增强A', value: '29.88%', chipLabel: '超额收益', chipValue: '+16.09%', caption: '', delta: '', deltaDir: 'up', deltaLabel: '' };
     case 'callout':   return { ...base, type, variant: 'note', title: '补充说明', content: '在此写入提示、警示或引用内容。' };
-    case 'tldr':      return { ...base, type, badge: '速览', title: '一图速览', points: ['核心观点 1', '核心观点 2', '核心观点 3'] };
-    case 'source':    return { ...base, type, items: [
+    case 'tldr':      return { ...base, type, variant: '', badge: '速览', title: '一图速览', points: ['核心观点 1', '核心观点 2', '核心观点 3'], items: [{ id: '1', text: '数据来源：Wind，截至 2026/3/31' }] };
+    case 'source':    return { ...base, type: 'tldr', variant: 'source', badge: '速览', title: '', points: [''], items: [
       { id: '1', text: '数据来源：Wind，截至 2026/3/31' },
       { id: '2', text: '基金定期报告，基金官方网站' }
     ] };
@@ -2271,10 +2270,17 @@ function migrateBlock(blk) {
     ['value','label','caption','delta','deltaLabel','chipLabel','chipValue'].forEach(k => { if (blk[k] === undefined) blk[k] = ''; });
     if (!blk.deltaDir) blk.deltaDir = 'up';
   }
+  if (blk.type === 'source') {
+    blk.type = 'tldr';
+    if (!blk.variant) blk.variant = 'source';
+  }
+  if (blk.type === 'tldr') {
+    if (blk.variant === undefined) blk.variant = '';
+    if (!Array.isArray(blk.points)) blk.points = [''];
+    if (!Array.isArray(blk.items))  blk.items  = [{ id: '1', text: '' }];
+  }
   // 字段兜底（旧笔记打开不报错）
   if (blk.type === 'panel'  && !Array.isArray(blk.children)) blk.children = [];
-  if (blk.type === 'tldr'   && !Array.isArray(blk.points))   blk.points = [''];
-  if (blk.type === 'source' && !Array.isArray(blk.items))    blk.items = [{ id:'1', text:'' }];
   if (blk.type === 'disclaimer' && !blk.preset) blk.preset = 'standard';
   if (blk.type === 'disclaimer' && !blk.content) blk.content = DISCLAIMER_PRESETS.standard;
   if (blk.type === 'qrcode' && !blk.kind) blk.kind = 'wechat';
@@ -2952,32 +2958,36 @@ function _edBlockFields(blk, bi) {
       <textarea class="form-textarea" id="b${bi}_c" rows="3" placeholder="内容 支持 **加粗** ==强调==" style="margin-top:6px">${escAttr(blk.content||'')}</textarea>`;
     }
     case 'tldr': {
-      let tl = `<div class="data-row">
-        <input class="form-input" id="b${bi}_bg" value="${escAttr(blk.badge !== undefined ? blk.badge : '速览')}" placeholder="徽标文案 如 速览 / 摘要 / TL;DR" style="flex:0.4">
-        <input class="form-input" id="b${bi}_t" value="${escAttr(blk.title||'')}" placeholder="标题 如 一图速览">
+      const tv = blk.variant || '';
+      let tl = `<div class="seg-row" id="tlv_${bi}">
+        <button class="seg-btn ${!tv?'active':''}" data-tlv="">一图速览</button>
+        <button class="seg-btn ${tv==='source'?'active':''}" data-tlv="source">数据来源</button>
       </div>`;
-      (blk.points||[]).forEach((p, ii) => {
-        tl += `<div class="data-row" style="margin-top:6px"><span class="data-row-num">${ii+1}</span><input class="form-input" id="b${bi}_p${ii}" value="${escAttr(p)}" placeholder="要点 ${ii+1}">
-          ${(blk.points||[]).length>1?`<button class="data-row-btn danger" onclick="App.delTldrPoint(${bi},${ii})">×</button>`:''}
+      if (tv === 'source') {
+        (blk.items||[]).forEach((it, ii) => {
+          tl += `<div class="data-row" style="margin-top:6px">
+            <span class="data-row-num">${ii+1}</span>
+            <input class="form-input" id="b${bi}_sid${ii}" value="${escAttr(it.id||'')}" placeholder="编号" style="flex:0.2">
+            <input class="form-input" id="b${bi}_stx${ii}" value="${escAttr(it.text||'')}" placeholder="来源 如 数据来源：Wind，截至 ...">
+            <button class="data-row-btn" onclick="App.insertToday(${bi},${ii})" title="在末尾追加 截至 ${_today()}">📅</button>
+            ${(blk.items||[]).length>1?`<button class="data-row-btn danger" onclick="App.delSourceItem(${bi},${ii})">×</button>`:''}
+          </div>`;
+        });
+        tl += `<button class="add-row-btn" onclick="App.addSourceItem(${bi})">+ 添加来源</button>`;
+        tl += `<div class="form-hint" style="margin-top:6px;font-size:11px;color:#888">📅 一键追加"截至 ${_today()}"。正文中用 <code>[^1]</code> 生成上标引用。</div>`;
+      } else {
+        tl += `<div class="data-row" style="margin-top:6px">
+          <input class="form-input" id="b${bi}_bg" value="${escAttr(blk.badge !== undefined ? blk.badge : '速览')}" placeholder="徽标 如 速览 / 摘要" style="flex:0.4">
+          <input class="form-input" id="b${bi}_t" value="${escAttr(blk.title||'')}" placeholder="标题 如 一图速览">
         </div>`;
-      });
-      if ((blk.points||[]).length < 5) tl += `<button class="add-row-btn" onclick="App.addTldrPoint(${bi})">+ 添加要点</button>`;
+        (blk.points||[]).forEach((p, ii) => {
+          tl += `<div class="data-row" style="margin-top:6px"><span class="data-row-num">${ii+1}</span><input class="form-input" id="b${bi}_p${ii}" value="${escAttr(p)}" placeholder="要点 ${ii+1}">
+            ${(blk.points||[]).length>1?`<button class="data-row-btn danger" onclick="App.delTldrPoint(${bi},${ii})">×</button>`:''}
+          </div>`;
+        });
+        if ((blk.points||[]).length < 5) tl += `<button class="add-row-btn" onclick="App.addTldrPoint(${bi})">+ 添加要点</button>`;
+      }
       return tl;
-    }
-    case 'source': {
-      let sh = '';
-      (blk.items||[]).forEach((it, ii) => {
-        sh += `<div class="data-row" style="margin-top:6px">
-          <span class="data-row-num">${ii+1}</span>
-          <input class="form-input" id="b${bi}_sid${ii}" value="${escAttr(it.id||'')}" placeholder="编号" style="flex:0.2">
-          <input class="form-input" id="b${bi}_stx${ii}" value="${escAttr(it.text||'')}" placeholder="来源 如 数据来源：Wind，截至 ...">
-          <button class="data-row-btn" onclick="App.insertToday(${bi},${ii})" title="在末尾追加 截至 ${_today()}">📅</button>
-          ${(blk.items||[]).length>1?`<button class="data-row-btn danger" onclick="App.delSourceItem(${bi},${ii})">×</button>`:''}
-        </div>`;
-      });
-      sh += `<button class="add-row-btn" onclick="App.addSourceItem(${bi})">+ 添加来源</button>`;
-      sh += `<div class="form-hint" style="margin-top:6px;font-size:11px;color:#888">📅 一键追加"截至 ${_today()}"。正文中用 <code>[^1]</code> 生成上标引用。</div>`;
-      return sh;
     }
     case 'disclaimer': {
       const presets = [
@@ -3297,7 +3307,7 @@ function _renderBlocksUI(page) {
     { label: '文本', types: ['text','bullets','numbered','checklist','highlight','callout','quote','infocard','sectionHeader'] },
     { label: '数据', types: ['keystat','kpigrid','ranking','progress','sparkcard','table'] },
     { label: '视觉', types: ['image','gallery','textWrap','tags','qrcode'] },
-    { label: '版式', types: ['tldr','panel','grid','divider','source','disclaimer'] },
+    { label: '版式', types: ['tldr','panel','grid','divider','disclaimer'] },
   ];
   BLOCK_GROUPS.forEach(g => {
     h += `<div class="add-block-group"><div class="add-block-group-label">${g.label}</div><div class="add-block-row">`;
@@ -4341,19 +4351,27 @@ function bindEditorEvents() {
       });
     }
     else if (blk.type === 'tldr') {
-      bnd('bg', blk, 'badge', true);
-      bnd('t', blk, 'title', true);
-      (blk.points||[]).forEach((_,ii) => {
-        const el=document.getElementById(`b${bi}_p${ii}`);
-        if(el) el.addEventListener('input',()=>{blk.points[ii]=el.value;_scheduleCardRender();});
-      });
-    }
-    else if (blk.type === 'source') {
-      (blk.items||[]).forEach((it,ii) => {
-        const idEl=document.getElementById(`b${bi}_sid${ii}`);
-        const txEl=document.getElementById(`b${bi}_stx${ii}`);
-        if(idEl) idEl.addEventListener('input',()=>{it.id=idEl.value;_scheduleCardRender();});
-        if(txEl) txEl.addEventListener('input',()=>{it.text=txEl.value;_scheduleCardRender();});
+      const tv = blk.variant || '';
+      if (tv === 'source') {
+        (blk.items||[]).forEach((it,ii) => {
+          const idEl=document.getElementById(`b${bi}_sid${ii}`);
+          const txEl=document.getElementById(`b${bi}_stx${ii}`);
+          if(idEl) idEl.addEventListener('input',()=>{it.id=idEl.value;_scheduleCardRender();});
+          if(txEl) txEl.addEventListener('input',()=>{it.text=txEl.value;_scheduleCardRender();});
+        });
+      } else {
+        bnd('bg', blk, 'badge', true);
+        bnd('t', blk, 'title', true);
+        (blk.points||[]).forEach((_,ii) => {
+          const el=document.getElementById(`b${bi}_p${ii}`);
+          if(el) el.addEventListener('input',()=>{blk.points[ii]=el.value;_scheduleCardRender();});
+        });
+      }
+      const tlv=document.getElementById(`tlv_${bi}`);
+      if (tlv) tlv.addEventListener('click', e => {
+        const b=e.target.closest('.seg-btn'); if(!b)return;
+        blk.variant=b.dataset.tlv;
+        renderEditorFields(); renderCard();
       });
     }
     else if (blk.type === 'panel') {
@@ -4795,20 +4813,20 @@ function renderBlock(blk, sz) {
       </div>`;
     }
     case 'tldr': {
+      if (blk.variant === 'source') {
+        const items = (blk.items||[]).filter(i=>i && i.text && i.text.trim());
+        if (!items.length) return '';
+        return `<div class="cb-source${extraCls}">
+          <span class="sr-label">Sources · 来源</span>
+          <ol>${items.map(i=>`<li><span class="sr-id">[${esc(i.id||'')}]</span> ${inl(i.text)}</li>`).join('')}</ol>
+        </div>`;
+      }
       const pts = (blk.points||[]).filter(p=>p && p.trim());
       const badge = (blk.badge !== undefined ? blk.badge : '速览').trim();
       return `<div class="cb-tldr ${effectiveSz}${extraCls}"${wrapStyle}>
         ${badge?`<span class="td-badge">${esc(badge)}</span>`:''}
         ${blk.title?`<div class="td-title">${esc(blk.title)}</div>`:''}
         ${pts.length?`<ul class="td-list">${pts.map(p=>`<li>${inl(p)}</li>`).join('')}</ul>`:''}
-      </div>`;
-    }
-    case 'source': {
-      const items = (blk.items||[]).filter(i=>i && i.text && i.text.trim());
-      if (!items.length) return '';
-      return `<div class="cb-source${extraCls}">
-        <span class="sr-label">Sources · 来源</span>
-        <ol>${items.map(i=>`<li><span class="sr-id">[${esc(i.id||'')}]</span> ${inl(i.text)}</li>`).join('')}</ol>
       </div>`;
     }
     case 'panel': {
