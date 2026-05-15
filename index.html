@@ -3726,7 +3726,9 @@ function _tbl(bi) { return bi === 'dc' ? cp().tableData : cp().blocks[bi]; }
 
 // ====== Block Global Mutations (public API — exposed via window for inline onclick) ======
 const App = {
-  undo: () => undo(),
+  // 注意：必须用真函数引用，不能写 () => undo()。Object.assign(window,App) 会把
+  // window.undo 覆盖为该箭头，箭头内 undo() 又解析回 window.undo → 无限递归爆栈。
+  undo,
   // 模式：先 mutation，后 pushHistory（栈顶始终 = 当前状态）
   addBlock(type)    { cp().blocks.push(makeBlock(type)); renderEditorFields(); renderCard(); pushHistory('添加块'); },
   toggleBlockFold(bi){ state._uiFolded = state._uiFolded || new Set(); if(state._uiFolded.has(bi)) state._uiFolded.delete(bi); else state._uiFolded.add(bi); renderEditorFields(); },
