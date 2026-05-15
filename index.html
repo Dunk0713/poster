@@ -2206,7 +2206,7 @@ function makeBlock(type) {
     case 'grid':      return { ...base, type, items: [{ label:'', text:'' }, { label:'', text:'' }] };
     case 'divider':   return { type, spacing: '' };
     case 'checklist': return { ...base, type, items: [{ text: '', done: false }] };
-    case 'image':     return { ...base, type, src: '', caption: '', fit: 'contain', h: 0, cropX: 50, cropY: 50 };
+    case 'image':     return { ...base, type, src: '', caption: '', fit: 'contain', h: 0, cropX: 50, cropY: 50, zoom: 1 };
     case 'sectionHeader': return { ...base, type, label: '', num: '', icon: '', shStyle: '' };
     case 'gallery':   return { ...base, type, images: [{ src: '', label: '' }, { src: '', label: '' }], layout: '2' };
     case 'textWrap':  return { ...base, type, content: '', src: '', wrapSide: 'left', wrapSize: '', wrapRound: '', wrapGap: '', wrapShadow: '', wrapVAlign: '' };
@@ -2295,6 +2295,7 @@ function migrateBlock(blk) {
   if (blk.type === 'disclaimer' && !blk.content) blk.content = DISCLAIMER_PRESETS.standard;
   if (blk.type === 'qrcode' && !blk.kind) blk.kind = 'wechat';
   if (blk.type === 'qrcode' && !blk.size) blk.size = 'm';
+  if (blk.type === 'image' && (blk.zoom === undefined || blk.zoom === null || !(Number(blk.zoom) >= 1))) blk.zoom = 1;
   if (blk.type === 'table') {
     if (!Array.isArray(blk.headers)) blk.headers = ['指标','A','B'];
     if (!Array.isArray(blk.rows)) blk.rows = [[{text:''},{text:''},{text:''}]];
@@ -3275,7 +3276,12 @@ function _edBlockFields(blk, bi) {
           <div class="focal-crosshair focal-crosshair-h" style="top:${blk.cropY||50}%"></div>
           <div class="focal-crosshair focal-crosshair-v" style="left:${blk.cropX||50}%"></div>
         </div>
-        <div class="form-hint">点击设置裁剪焦点</div>` : ''}
+        <div class="form-hint">点击设置裁剪焦点</div>
+        <div class="img-slider-row" style="margin-top:5px">
+          <span style="font-size:11px;color:#9a8878;white-space:nowrap">缩放</span>
+          <input type="range" class="blk-zoom-slider" data-bi="${bi}" min="1" max="3" step="0.05" value="${Math.max(1,Math.min(3,Number(blk.zoom)||1))}">
+          <span class="img-slider-val blk-zoom-val" data-bi="${bi}">${(Math.max(1,Math.min(3,Number(blk.zoom)||1))).toFixed(2)}×</span>
+        </div>` : ''}
         <div class="img-slider-row" id="blkSliderRow_${bi}"${bAuto?' style="opacity:0.55':''}>
           <span style="font-size:11px;color:#9a8878;white-space:nowrap">高度</span>
           <input type="range" class="blk-h-slider" data-bi="${bi}" min="100" max="${state.cardH - 148}" step="10" value="${bSliderV}">
@@ -4520,6 +4526,14 @@ function bindEditorEvents() {
           renderCard();
         });
       }
+      // Block 缩放滑块（仅 cover 有意义）
+      const zSlider = document.querySelector(`.blk-zoom-slider[data-bi="${bi}"]`);
+      if (zSlider) zSlider.addEventListener('input', () => {
+        blk.zoom = Number(zSlider.value) || 1;
+        const zv = document.querySelector(`.blk-zoom-val[data-bi="${bi}"]`);
+        if (zv) zv.textContent = blk.zoom.toFixed(2) + '×';
+        _scheduleCardRender();
+      });
       // Image drop
       const drop=document.getElementById(`imgDrop_${bi}`), inp=document.getElementById(`imgInput_${bi}`);
       if(drop && inp) {
@@ -4979,7 +4993,9 @@ function renderBlock(blk, sz) {
       let bContS = '', bImgS = '';
       if (bFit === 'cover') {
         if (bH > 0) bContS = ` style="height:${bH}px"`;
-        bImgS = ` style="object-position:${blk.cropX||50}% ${blk.cropY||50}%"`;
+        const z = Math.max(1, Math.min(4, Number(blk.zoom) || 1));
+        const zS = z > 1 ? `;transform:scale(${z});transform-origin:${blk.cropX||50}% ${blk.cropY||50}%` : '';
+        bImgS = ` style="object-position:${blk.cropX||50}% ${blk.cropY||50}%${zS}"`;
       } else {
         if (bH > 0) bImgS = ` style="max-height:${bH}px"`;
       }
