@@ -1665,9 +1665,9 @@ body {
 .bk-al-right.bk-mw-sm, .bk-al-right.bk-mw-md, .bk-al-right.bk-mw-lg { margin-left: auto; margin-right: 0; }
 
 /* ── 3.2-D 块并排行容器 ── */
-.cb-row { display: flex; gap: var(--space-6); align-items: stretch; margin-bottom: var(--space-block); }
+.cb-row { display: flex; gap: var(--space-6); align-items: flex-start; margin-bottom: var(--space-block); }
 .cb-row .cb-rowcell { flex: 1 1 0; min-width: 0; }
-.cb-row .cb-rowcell > * { margin-bottom: 0 !important; height: 100%; }
+.cb-row .cb-rowcell > * { margin-bottom: 0 !important; }
 
 /* ── Line-height variants ── */
 .lh-tight, .lh-tight li, .lh-tight .mod-text, .lh-tight .q-text,
@@ -2296,6 +2296,7 @@ function migrateBlock(blk) {
   if (blk.type === 'qrcode' && !blk.kind) blk.kind = 'wechat';
   if (blk.type === 'qrcode' && !blk.size) blk.size = 'm';
   if (blk.type === 'image' && (blk.zoom === undefined || blk.zoom === null || !(Number(blk.zoom) >= 1))) blk.zoom = 1;
+  if (blk.type !== 'divider') { if (blk.align === undefined) blk.align = ''; if (blk.maxW === undefined) blk.maxW = ''; if (blk.col === undefined) blk.col = ''; }
   if (blk.type === 'table') {
     if (!Array.isArray(blk.headers)) blk.headers = ['指标','A','B'];
     if (!Array.isArray(blk.rows)) blk.rows = [[{text:''},{text:''},{text:''}]];
@@ -2781,10 +2782,20 @@ function _panelChildFields(ch, bi, ci) {
   const id = (f) => `b${bi}_c${ci}_${f}`;
   const t = ch.type;
   if (t === 'text')      return `<textarea class="form-textarea" id="${id('c')}" rows="2" placeholder="段落内容（支持 **粗体** ==高亮==，回车换行）">${escAttr(ch.content||'')}</textarea>`;
-  if (t === 'keystat')   return `<div class="data-row"><input class="form-input" id="${id('v')}" value="${escAttr(ch.value||'')}" placeholder="数值"><input class="form-input" id="${id('l')}" value="${escAttr(ch.label||'')}" placeholder="说明"></div>`;
-  if (t === 'herostat')  return `<div class="data-row"><input class="form-input" id="${id('v')}" value="${escAttr(ch.value||'')}" placeholder="巨型数字"><input class="form-input" id="${id('l')}" value="${escAttr(ch.label||'')}" placeholder="标签"></div><input class="form-input" id="${id('cap')}" value="${escAttr(ch.caption||'')}" placeholder="说明（可选）" style="margin-top:6px">`;
-  if (t === 'metric')    return `<div class="data-row"><input class="form-input" id="${id('v')}" value="${escAttr(ch.value||'')}" placeholder="数值"><input class="form-input" id="${id('l')}" value="${escAttr(ch.label||'')}" placeholder="标签"></div><div class="data-row" style="margin-top:6px"><input class="form-input" id="${id('d')}" value="${escAttr(ch.delta||'')}" placeholder="差值 +/-"><input class="form-input" id="${id('dl')}" value="${escAttr(ch.deltaLabel||'')}" placeholder="差值说明"></div>`;
-  if (t === 'compare')   return `<input class="form-input" id="${id('lbl')}" value="${escAttr(ch.label||'')}" placeholder="项目名称"><div class="data-row" style="margin-top:6px"><input class="form-input" id="${id('v')}" value="${escAttr(ch.value||'')}" placeholder="主数值"><input class="form-input" id="${id('cv')}" value="${escAttr(ch.chipValue||'')}" placeholder="对比药丸 +x.x%"></div>`;
+  if (t === 'keystat') {
+    const kv = ch.variant || '';
+    let s = `<div class="seg-row" id="${id('kv')}">
+      <button class="seg-btn ${!kv?'active':''}" data-pkv="">核心</button>
+      <button class="seg-btn ${kv==='hero'?'active':''}" data-pkv="hero">巨型</button>
+      <button class="seg-btn ${kv==='metric'?'active':''}" data-pkv="metric">指标</button>
+      <button class="seg-btn ${kv==='compare'?'active':''}" data-pkv="compare">对比</button>
+    </div>
+    <div class="data-row" style="margin-top:6px"><input class="form-input" id="${id('v')}" value="${escAttr(ch.value||'')}" placeholder="${kv==='compare'?'主数值':'数值'}"><input class="form-input" id="${id('l')}" value="${escAttr(ch.label||'')}" placeholder="${kv==='compare'?'名称':'说明'}"></div>`;
+    if (kv === 'hero') s += `<input class="form-input" id="${id('cap')}" value="${escAttr(ch.caption||'')}" placeholder="说明（可选）" style="margin-top:6px">`;
+    if (kv === 'metric') s += `<div class="data-row" style="margin-top:6px"><input class="form-input" id="${id('d')}" value="${escAttr(ch.delta||'')}" placeholder="差值 +/-"><input class="form-input" id="${id('dl')}" value="${escAttr(ch.deltaLabel||'')}" placeholder="差值说明"></div>`;
+    if (kv === 'compare') s += `<div class="data-row" style="margin-top:6px"><input class="form-input" id="${id('cl')}" value="${escAttr(ch.chipLabel||'')}" placeholder="药丸标签"><input class="form-input" id="${id('cv')}" value="${escAttr(ch.chipValue||'')}" placeholder="药丸数值 +x.x%"></div>`;
+    return s;
+  }
   if (t === 'callout')   return `<div class="data-row"><input class="form-input" id="${id('t')}" value="${escAttr(ch.title||'')}" placeholder="标题"></div><textarea class="form-textarea" id="${id('c')}" rows="2" placeholder="内容（回车换行）" style="margin-top:6px">${escAttr(ch.content||'')}</textarea>`;
   if (t === 'bullets')   {
     let h = '';
@@ -3149,7 +3160,7 @@ function _edBlockFields(blk, bi) {
           ${_panelChildFields(ch, bi, ci)}
         </div>`;
       });
-      const allowed = ['keystat','herostat','metric','compare','callout','text','bullets','ranking','progress','sparkcard'];
+      const allowed = ['keystat','callout','text','bullets','ranking','progress','sparkcard'];
       ph += `<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">`;
       allowed.forEach(t => { ph += `<button class="add-row-btn" style="padding:3px 8px;font-size:11px" onclick="App.addPanelChild(${bi},'${t}')">+ ${BLOCK_TYPES[t]||t}</button>`; });
       ph += `</div></div>`;
@@ -4413,10 +4424,19 @@ function bindEditorEvents() {
         const id = (f) => `b${bi}_c${ci}_${f}`;
         const bindCh = (suffix, key) => { const el=document.getElementById(id(suffix)); if(el) el.addEventListener('input',()=>{ ch[key]=el.value; _scheduleCardRender(); }); };
         if (ch.type === 'text')      bindCh('c','content');
-        else if (ch.type === 'keystat') { bindCh('v','value'); bindCh('l','label'); }
-        else if (ch.type === 'herostat'){ bindCh('v','value'); bindCh('l','label'); bindCh('cap','caption'); }
-        else if (ch.type === 'metric')  { bindCh('v','value'); bindCh('l','label'); bindCh('d','delta'); bindCh('dl','deltaLabel'); }
-        else if (ch.type === 'compare') { bindCh('lbl','label'); bindCh('v','value'); bindCh('cv','chipValue'); }
+        else if (ch.type === 'keystat') {
+          const kv = ch.variant || '';
+          bindCh('v','value'); bindCh('l','label');
+          if (kv === 'hero') bindCh('cap','caption');
+          if (kv === 'metric') { bindCh('d','delta'); bindCh('dl','deltaLabel'); }
+          if (kv === 'compare') { bindCh('cl','chipLabel'); bindCh('cv','chipValue'); }
+          const kvr = document.getElementById(id('kv'));
+          if (kvr) kvr.addEventListener('click', e => {
+            const b = e.target.closest('.seg-btn'); if(!b) return;
+            ch.variant = b.dataset.pkv;
+            renderEditorFields(); renderCard();
+          });
+        }
         else if (ch.type === 'callout') { bindCh('t','title'); bindCh('c','content'); }
         else if (ch.type === 'bullets') {
           (ch.items||[]).forEach((_,ii) => { const el=document.getElementById(id('i'+ii)); if(el) el.addEventListener('input',()=>{ ch.items[ii]=el.value; _scheduleCardRender(); }); });
