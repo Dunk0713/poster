@@ -2602,31 +2602,120 @@ function parsePasteSeries(text) {
   if (first !== 0) { const pct = (last - first) / Math.abs(first) * 100; delta = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'; }
   return { values: nums.join(','), value: String(last), delta, deltaDir: dir };
 }
+// 单段落 → 选出最贴切的块类型（高亮 / 引用 / 语义卡 / 数据 / 来源 / 风险 / 段落）
+function _classifyProsePara(t) {
+  t = t.trim();
+  const oneLine = !t.includes('\n');
+  const plain = t.replace(/[*=~`>]/g, '').trim();
+  const len = plain.length;
+
+  // 1. 风险提示 / 免责声明
+  if (len >= 14 && /(基金有风险|投资需谨慎|投资有风险|过往业绩(并)?不(预示|代表|构成)|不预示其?未来|不构成(任何)?投资(建议|意见)|市场有风险[，,]入市|风险承受能力|招募说明书|基金合同)/.test(t)) {
+    const b = makeBlock('disclaimer'); b.preset = 'custom';
+    b.content = t.replace(/^\s*[-•*·–▪◦]\s*/, '').replace(/\n+/g, ' ').trim();
+    return b;
+  }
+  // 2. 数据来源 / 统计口径
+  if (oneLine && /^(数据来源|资料来源|来源|数据截[至止]|统计[区时]间|样本区间|注[:：]|备注|Source)\s*[:：]/i.test(t)) {
+    const b = makeBlock('source'); b.points = [];
+    b.items = [{ id: '1', text: t.trim() }];
+    return b;
+  }
+  // 3. 语义卡片：注意 / 提示 / 建议 / 划重点
+  const mCall = t.match(/^(?:[⚠‼❗💡✦✅👉🔔📌🚨]+\s*)?(注意|特别提醒|重要提醒|温馨提示|友情提示|警示|风险提示|提示|小贴士|小提示|划重点|敲黑板|建议|Tips?)\s*[:：]\s*([\s\S]+)$/i);
+  if (mCall) {
+    const key = mCall[1];
+    let variant = 'note';
+    if (/警示|风险|注意|提醒/.test(key)) variant = 'warning';
+    else if (/建议|划重点|敲黑板|Tip/i.test(key)) variant = 'tip';
+    const b = makeBlock('callout'); b.variant = variant;
+    b.title = key; b.content = mCall[2].trim();
+    return b;
+  }
+  // 4. 引用 / 金句：>引文 ｜ 「…」整段 ｜ …——署名
+  if (/^>\s?/.test(t)) {
+    const body = t.replace(/^>\s?/gm, '').trim();
+    const b = makeBlock('quote');
+    const at = body.match(/^([\s\S]+?)\s*[—–]{1,2}\s*([^\n—–]{1,20})$/);
+    if (at && at[1].trim().length >= 4) { b.content = at[1].trim(); b.source = at[2].trim(); }
+    else b.content = body;
+    return b;
+  }
+  const wrap = oneLine && t.match(/^[「『“"《]([\s\S]+?)[」』”"》]$/);
+  if (wrap && len >= 4 && len <= 60) {
+    const b = makeBlock('quote'); b.content = wrap[1].trim(); return b;
+  }
+  const am = oneLine && t.match(/^([\s\S]{6,60}?)\s*[—–]{1,2}\s*([^\n—–]{2,20})$/);
+  if (am && /[一-龥A-Za-z]/.test(am[2])) {
+    const b = makeBlock('quote'); b.content = am[1].trim(); b.source = am[2].trim(); return b;
+  }
+  // 5. 标注式高亮：核心观点：xxx / 重点：xxx
+  const hm = t.match(/^(核心观点|核心逻辑|核心结论|核心|重点|关键点|关键词|关键|结论|本质|一句话总结|一句话|划重点)\s*[:：]\s*([\s\S]+)$/);
+  if (hm) {
+    const b = makeBlock('highlight'); b.label = hm[1]; b.content = hm[2].trim(); return b;
+  }
+  // 6. 关键数据：短行「标签 +12.5%」形态
+  if (oneLine && len <= 22) {
+    const km = t.match(/^([^\d+\-—–][^:：]{0,11}?)\s*[:：]?\s*([+\-]?\d[\d,.]*\s*(?:%|％|亿|万|倍|bp|BP|个百分点|元|pct)?)\s*$/);
+    if (km && km[1].trim() && /\d/.test(km[2])) {
+      const b = makeBlock('keystat'); b.variant = '';
+      b.value = km[2].replace(/\s/g, ''); b.label = km[1].trim();
+      if (/^\+/.test(km[2])) b.deltaDir = 'up';
+      else if (/^-/.test(km[2])) b.deltaDir = 'down';
+      return b;
+    }
+  }
+  // 7. 全段强调（==…== 或整段 **…**）→ 高亮
+  const allEm = oneLine && t.match(/^(?:==\s*([\s\S]+?)\s*==|\*\*\s*([\s\S]+?)\s*\*\*)$/);
+  if (allEm && len <= 50) {
+    const b = makeBlock('highlight'); b.content = (allEm[1] || allEm[2]).trim(); return b;
+  }
+  // 8. 点睛金句：独立成段、较短、含转折/断言词 → 高亮
+  if (oneLine && len >= 8 && len <= 36 && !/[，,；;]/.test(plain) &&
+      /(才是|不是|而是|关键在于|本质上|本质是|真正的?|永远|从来不?|决定性?|的核心|最重要)/.test(plain)) {
+    const b = makeBlock('highlight'); b.content = t.trim(); return b;
+  }
+  // 默认：段落文字
+  const b = makeBlock('text'); b.content = t; return b;
+}
 function parsePasteProse(text) {
   const lines = String(text || '').replace(/\r/g, '').split('\n');
   const blocks = []; let para = [], bulletBuf = null, numBuf = null;
-  const flushPara = () => { if (para.length) { const b = makeBlock('text'); b.content = para.join('\n'); blocks.push(b); para = []; } };
-  const flushBullet = () => { if (bulletBuf) { const b = makeBlock('bullets'); b.items = bulletBuf; blocks.push(b); bulletBuf = null; } };
-  const flushNum = () => { if (numBuf) { const b = makeBlock('numbered'); b.items = numBuf; blocks.push(b); numBuf = null; } };
+  const flushPara = () => { if (para.length) { const t = para.join('\n').trim(); para = []; if (t) blocks.push(_classifyProsePara(t)); } };
+  const flushBullet = () => { if (bulletBuf && bulletBuf.length) { const b = makeBlock('bullets'); b.items = bulletBuf; blocks.push(b); } bulletBuf = null; };
+  const flushNum = () => { if (numBuf && numBuf.length) { const b = makeBlock('numbered'); b.items = numBuf; blocks.push(b); } numBuf = null; };
   const flushAll = () => { flushPara(); flushBullet(); flushNum(); };
-  const reB = /^\s*[-•*·–▪◦]\s+/, reN = /^\s*(\d+[.、)）]|[①②③④⑤⑥⑦⑧⑨⑩])\s*/;
-  const isHeading = t => {
-    if (/^#{1,6}\s+/.test(t)) return true;
-    if (t.length === 0 || t.length > 16) return false;
-    if (/[。！？!?，,、；;]$/.test(t)) return false;
-    return true;
+  const reB = /^\s*[-•*·–▪◦‣]\s+/, reN = /^\s*(\d+[.、)）]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫])\s*/;
+  // 返回标题文本（已剥离标记），非标题返回 null
+  const headingOf = (t, next) => {
+    if (/^#{1,6}\s+/.test(t)) return t.replace(/^#{1,6}\s+/, '').replace(/^\*\*(.+?)\*\*$/, '$1').trim();
+    const br = t.match(/^[【\[]\s*([^】\]]{1,22})\s*[】\]]\s*$/);
+    if (br) return br[1].trim();
+    const cn = t.match(/^(第[一二三四五六七八九十百\d]+[章节部分讲篇]|[一二三四五六七八九十]+[、.．]|（\s*[一二三四五六七八九十\d]+\s*）|\(\s*[一二三四五六七八九十\d]+\s*\))\s*(.{1,18})$/);
+    if (cn && !/[。！？!?，,；;]$/.test(cn[2])) return t.trim();
+    if (/^[^。！？!?，,、；;\n]{2,18}[:：]\s*$/.test(t)) return t.replace(/[:：]\s*$/, '').trim();
+    const pure = t.replace(/^\*\*(.+?)\*\*$/, '$1').trim();
+    if (pure.length === 0 || pure.length > 16) return null;
+    if (/[。！？!?，,、；;：…,.]$/.test(pure)) return null;
+    if (reB.test(t) || reN.test(t)) return null;
+    if (next === '' || next.length > pure.length || reB.test(next) || reN.test(next)) return pure;
+    return null;
   };
   for (let i = 0; i < lines.length; i++) {
     const t = lines[i].trim();
     if (t === '') { flushAll(); continue; }
-    if (reB.test(t)) { flushPara(); flushNum(); (bulletBuf = bulletBuf || []).push(t.replace(reB, '')); continue; }
-    if (reN.test(t)) { flushPara(); flushBullet(); (numBuf = numBuf || []).push(t.replace(reN, '')); continue; }
-    const next = (lines[i + 1] || '').trim();
-    if (para.length === 0 && isHeading(t) && (next === '' || next.length > t.length || reB.test(next) || reN.test(next))) {
-      flushAll();
-      const b = makeBlock('sectionHeader');
-      b.label = t.replace(/^#{1,6}\s+/, '').replace(/^\*\*(.+)\*\*$/, '$1');
-      blocks.push(b); continue;
+    if (reB.test(t)) { flushPara(); flushNum(); (bulletBuf = bulletBuf || []).push(t.replace(reB, '').trim()); continue; }
+    if (reN.test(t)) { flushPara(); flushBullet(); (numBuf = numBuf || []).push(t.replace(reN, '').trim()); continue; }
+    if (para.length === 0) {
+      const next = (lines[i + 1] || '').trim();
+      const head = headingOf(t, next);
+      if (head) {
+        flushAll();
+        const b = makeBlock('sectionHeader'); b.label = head;
+        const nm = head.match(/^(?:第([一二三四五六七八九十百\d]+)[章节部分讲篇]|([一二三四五六七八九十]+)[、.．]|（\s*([一二三四五六七八九十\d]+)\s*）)\s*(.+)$/);
+        if (nm) { b.num = (nm[1] || nm[2] || nm[3] || '').trim(); b.label = nm[4].trim(); }
+        blocks.push(b); continue;
+      }
     }
     flushBullet(); flushNum(); para.push(t);
   }
