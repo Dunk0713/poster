@@ -404,7 +404,7 @@ body {
 .toast.toast-error { background: #c03020; }
 .toast.toast-success { background: #2e8a4e; }
 .toast.toast-action { pointer-events: auto; cursor: default; padding-right: 12px; }
-.toast.toast-action [data-restore]:hover { background: rgba(255,255,255,0.32) !important; }
+.toast.toast-action [data-act]:hover { background: rgba(255,255,255,0.32) !important; }
 
 /* 智能粘贴模态 */
 .pm-mask { position: fixed; inset: 0; background: rgba(20,12,6,0.42); z-index: 1100; display: none; align-items: center; justify-content: center; padding: 24px; }
@@ -2209,7 +2209,8 @@ const BLOCK_COLORS = [
 
 function makeBlock(type) {
   // 1.6：canonical 排版字段只保留 rhythm + fontWeight（旧 spacing/lineHeight 由 migrateBlock 收敛后删除）
-  const base = { customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '', align: '', maxW: '', col: '' };
+  // _uid：稳定块身份（C1）——用于焦点恢复、撤销快照对比，与业务字段隔离
+  const base = { _uid: _genUid(), customSize: '', customColor: '', blockStyle: '', rhythm: '', fontWeight: '', align: '', maxW: '', col: '' };
   switch(type) {
     case 'text':      return { ...base, type, content: '' };
     case 'bullets':   return { ...base, type, items: [''] };
@@ -2350,6 +2351,13 @@ function migrateBlock(blk) {
   if (blk.type === 'panel' && Array.isArray(blk.children)) {
     blk.children = blk.children.map(migrateBlock);
   }
+  // C1：图片 src 协议白名单过滤——防御导入恶意存档时的 javascript:/data:text 等
+  if (blk.src) blk.src = _safeImgSrc(blk.src);
+  if (blk.type === 'gallery' && Array.isArray(blk.images)) {
+    blk.images.forEach(im => { if (im && im.src) im.src = _safeImgSrc(im.src); });
+  }
+  // C1：稳定 uid 兜底——旧档无 _uid 时补齐
+  if (!blk._uid) blk._uid = _genUid();
   return blk;
 }
 
@@ -2401,19 +2409,36 @@ function _debounce(fn, delay) {
   };
 }
 
-/** Save current focus/selection info */
+/** Save current focus/selection info — C1：优先记录块 uid，避免增删块后 id 错位 */
 function _saveFocus() {
   const el = document.activeElement;
   if (!el || !el.id) return null;
-  // selectionStart 在非文本类输入（如 type=color/checkbox）下为 undefined，需用 in 检测
-  if (!('selectionStart' in el)) return { id: el.id };
-  return { id: el.id, start: el.selectionStart, end: el.selectionEnd, top: el.scrollTop || 0 };
+  const base = ('selectionStart' in el)
+    ? { id: el.id, start: el.selectionStart, end: el.selectionEnd, top: el.scrollTop || 0 }
+    : { id: el.id };
+  // 形如 b<bi>_<suffix>：把 bi 换成稳定 uid
+  const m = /^b(\d+)_(.+)$/.exec(el.id);
+  if (m) {
+    const bi = parseInt(m[1]);
+    const blk = (cp().blocks || [])[bi];
+    if (blk && blk._uid) base.uid = blk._uid;
+    base.suffix = m[2];
+  }
+  return base;
 }
 
-/** Restore focus/selection after DOM rebuild */
+/** Restore focus/selection after DOM rebuild — uid 优先，回退到原 id */
 function _restoreFocus(info) {
   if (!info) return;
-  const el = document.getElementById(info.id);
+  let el = null;
+  // 优先 uid 查找（增删后 bi 变了也能找到）
+  if (info.uid && info.suffix) {
+    const blocks = (cp().blocks || []);
+    const idx = blocks.findIndex(b => b && b._uid === info.uid);
+    if (idx >= 0) el = document.getElementById('b' + idx + '_' + info.suffix);
+  }
+  // 回退到原 id
+  if (!el && info.id) el = document.getElementById(info.id);
   if (!el || !el.focus) return;
   el.focus({ preventScroll: true });
   if (info.start !== undefined) {
@@ -2480,18 +2505,23 @@ function showToast(msg, typeOrD = 'info', d = 2400) {
 
 // 带「撤销」按钮的可交互 toast（专为破坏性操作如删除提供 5s 内立即恢复入口）
 function showRestoreToast(msg, onRestore, ms = 5000) {
+  showActionToast(msg, '↶ 撤销', onRestore, ms, 'toast-info');
+}
+
+// C1：通用 action toast——撤销/重试等可点击操作复用此入口
+function showActionToast(msg, label, onClick, ms = 5000, typeCls = 'toast-info') {
   if (!els.toast) return;
-  els.toast.innerHTML = `${esc(msg)} <span style="margin-left:14px;padding:3px 10px;background:rgba(255,255,255,0.18);border-radius:14px;cursor:pointer;font-weight:700" data-restore="1">↶ 撤销</span>`;
-  els.toast.className = 'toast show toast-info toast-action';
+  els.toast.innerHTML = `${esc(msg)} <span style="margin-left:14px;padding:3px 10px;background:rgba(255,255,255,0.18);border-radius:14px;cursor:pointer;font-weight:700" data-act="1">${esc(label)}</span>`;
+  els.toast.className = 'toast show toast-action ' + typeCls;
   clearTimeout(showToast._t);
   const closeT = () => { els.toast.classList.remove('show'); els.toast.onclick = null; };
   showToast._t = setTimeout(closeT, ms);
   els.toast.onclick = (e) => {
-    const tgt = e.target.closest('[data-restore]');
+    const tgt = e.target.closest('[data-act]');
     if (!tgt) return;
     clearTimeout(showToast._t);
     closeT();
-    try { onRestore(); } catch(err) { console.error(err); }
+    try { onClick(); } catch(err) { console.error(err); }
   };
 }
 
@@ -2513,6 +2543,29 @@ function esc(t) {
 function escAttr(t) {
   if (!t) return '';
   return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// 稳定块标识——增删后焦点恢复 + 未来 schema 操作的稳定锚点
+// 注意：不依赖外部 let 变量，避免 state 初始化时的 TDZ
+function _genUid() {
+  return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// 图片 src 协议白名单：拒绝 javascript:/vbscript:/file: 等。
+// 接受：data:image/*、blob:、http(s):、协议相对、站内相对路径
+function _safeImgSrc(s) {
+  if (s == null) return '';
+  const v = String(s).trim();
+  if (!v) return '';
+  // 防御 NUL/控制字符夹带
+  for (let i = 0; i < v.length; i++) { if (v.charCodeAt(i) < 32) return ""; }
+  if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml|bmp|x-icon|avif);/i.test(v)) return v;
+  if (/^blob:/i.test(v)) return v;
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^\/\//.test(v)) return v;
+  // 相对路径（无协议、无冒号），允许 ./, ../, 字母数字开头
+  if (!/:/.test(v) && /^[.\w/-]/.test(v)) return v;
+  return '';
 }
 
 // **bold**, ==accent==, [^N] cite, \n → <br>
@@ -3859,6 +3912,8 @@ function pushHistoryDebounced(label) {
 
 // ====== Persistence & Archive ======
 const PERSIST_KEY = 'rnxhs:autosave';
+// C1：localStorage 快照 schema 版本——未来 state 字段断裂时按此分发迁移
+const SCHEMA_VERSION = 1;
 
 // 同步左侧静态全局元数据 input（这些控件不由 renderEditorFields 重建，需手动回填）
 function _syncGlobalMetaInputs() {
@@ -3869,11 +3924,14 @@ function _syncGlobalMetaInputs() {
 }
 
 // 旧档/存档迁移：补缺页字段 + 每块过 migrateBlock（让 migrateBlock 真正生效）
+// C1：所有用户可控的 src 字段都过 _safeImgSrc，防御导入恶意存档时的协议注入
 function migrateState(data) {
   if (!data || !Array.isArray(data.pages) || !data.pages.length) return null;
+  if (data.avatar) data.avatar = _safeImgSrc(data.avatar);
   data.pages = data.pages.map(p => {
     const merged = Object.assign(createPage((p && p.template) || 'text'), p || {});
     merged.blocks = Array.isArray(merged.blocks) ? merged.blocks.map(migrateBlock) : [];
+    if (merged.image) merged.image = _safeImgSrc(merged.image);
     // 1.5：统一图片适配字段——旧 fullImgFit(imageOnly 专用) 并入 imageFit，保留旧值
     merged.imageFit = (p && (p.imageFit || p.fullImgFit)) || 'contain';
     delete merged.fullImgFit;
@@ -3917,11 +3975,14 @@ function _applyState(data) {
   return true;
 }
 
-// 自动暂存到 localStorage（复用 _snapshot 的字段剥离逻辑）
+// 自动暂存到 localStorage（C1：带版本号 + 损坏保留备份，便于未来 schema 迁移）
 const _saveLocal = _debounce(() => {
   const snap = _snapshot();
   if (!snap) return;
-  try { localStorage.setItem(PERSIST_KEY, snap); }
+  try {
+    const payload = JSON.stringify({ v: SCHEMA_VERSION, savedAt: Date.now(), state: snap });
+    localStorage.setItem(PERSIST_KEY, payload);
+  }
   catch(e) {
     console.warn('autosave failed', e);
     showToast('内容较大，自动暂存失败，请用「存档」手动备份', 'warn', 4000);
@@ -3929,12 +3990,29 @@ const _saveLocal = _debounce(() => {
 }, 800);
 
 // init 时尝试恢复上次自动暂存（在首次 render() 前调用）
+// C1：兼容老格式（直接 state 对象）+ 损坏快照保留 backup key 便于人工恢复
 function restoreAutosave() {
   let raw = null;
   try { raw = localStorage.getItem(PERSIST_KEY); } catch(e) { return false; }
   if (!raw) return false;
   let data;
-  try { data = JSON.parse(raw); } catch(e) { console.warn('autosave parse fail', e); return false; }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && typeof parsed.v === 'number' && typeof parsed.state === 'string') {
+      // 新格式（v1+）：内层 state 是 JSON 字符串
+      data = JSON.parse(parsed.state);
+      // 未来 schema 升级在此根据 parsed.v 分发迁移
+    } else {
+      // 老格式：parsed 本身就是 state 对象——做次性迁移并保留备份
+      data = parsed;
+      try { localStorage.setItem(PERSIST_KEY + ':legacy', raw); } catch(_){}
+    }
+  } catch(e) {
+    console.warn('autosave parse fail', e);
+    // 损坏快照保留备份以备人工恢复，避免静默丢失
+    try { localStorage.setItem(PERSIST_KEY + ':corrupt', raw); } catch(_){}
+    return false;
+  }
   return _applyState(data);
 }
 
@@ -3951,19 +4029,34 @@ function exportArchive() {
   showToast('已导出存档 ✓', 'success');
 }
 
-// 手动导入 JSON 存档
+// 手动导入 JSON 存档（C1：错误信息友好化 + 兼容 v1+ 包装格式）
 function importArchive(file) {
   if (!file) return;
   const r = new FileReader();
   r.onload = () => {
     let data;
-    try { data = JSON.parse(r.result); }
-    catch(e) { showToast('存档文件无效（不是合法 JSON）', 'error', 4000); return; }
-    if (!_applyState(data)) { showToast('存档内容无法识别', 'error', 4000); return; }
+    try {
+      const parsed = JSON.parse(r.result);
+      // 兼容 v1+ localStorage 导出的包装格式
+      if (parsed && typeof parsed === 'object' && typeof parsed.v === 'number' && typeof parsed.state === 'string') {
+        data = JSON.parse(parsed.state);
+      } else {
+        data = parsed;
+      }
+    } catch(e) {
+      const m = (e && e.message ? e.message : '').match(/position (\d+)/i);
+      const where = m ? `（第 ${m[1]} 字符附近）` : '';
+      showToast(`存档文件不是合法 JSON${where}：${e.message||'未知错误'}`, 'error', 5500);
+      return;
+    }
+    if (!_applyState(data)) {
+      showToast('存档内容无法识别——请确认是本工具导出的 JSON 文件', 'error', 5000);
+      return;
+    }
     if (typeof render === 'function') render(); else { renderEditorFields(); renderCard(); }
     _syncGlobalMetaInputs();
     pushHistory('导入存档');
-    showToast('已导入存档 ✓', 'success');
+    showToast(`已导入存档（${state.pages.length} 页） ✓`, 'success');
   };
   r.onerror = () => showToast('读取文件失败', 'error', 4000);
   r.readAsText(file);
@@ -4181,7 +4274,7 @@ const App = {
     });
   },
   moveBlock(bi,d)   { const bl=cp().blocks, ni=bi+d; if(ni<0||ni>=bl.length)return; [bl[bi],bl[ni]]=[bl[ni],bl[bi]]; state._uiFolded && state._uiFolded.clear(); renderEditorFields(); renderCard(); pushHistory('移动块'); },
-  dupBlock(bi)      { const bl=cp().blocks; bl.splice(bi+1,0,JSON.parse(JSON.stringify(bl[bi]))); state._uiFolded && state._uiFolded.clear(); renderEditorFields(); renderCard(); pushHistory('复制块'); },
+  dupBlock(bi)      { const bl=cp().blocks; const clone=JSON.parse(JSON.stringify(bl[bi])); clone._uid=_genUid(); if(Array.isArray(clone.children)) clone.children.forEach(c=>{ if(c) c._uid=_genUid(); }); bl.splice(bi+1,0,clone); state._uiFolded && state._uiFolded.clear(); renderEditorFields(); renderCard(); pushHistory('复制块'); },
   addItem(bi)       { cp().blocks[bi].items.push(''); renderEditorFields(); renderCard(); pushHistory('添加项'); },
   delItem(bi,ii)    { const it=cp().blocks[bi].items; if(it.length<=1)return; it.splice(ii,1); renderEditorFields(); renderCard(); pushHistory('删除项'); },
   addCheckItem(bi)  { cp().blocks[bi].items.push({text:'',done:false}); renderEditorFields(); renderCard(); pushHistory('添加项'); },
@@ -5753,7 +5846,24 @@ if (_seriesToggle && _seriesBody) _seriesToggle.addEventListener('click', () => 
 
 els.pageStrip.addEventListener('click', e => {
   const del=e.target.closest('.delete-page');
-  if(del) { const idx=parseInt(del.dataset.del); if(state.pages.length<=1)return; state.pages.splice(idx,1); if(state.currentPageIndex>=state.pages.length) state.currentPageIndex=state.pages.length-1; render(); pushHistory('删除页'); return; }
+  if(del) {
+    const idx=parseInt(del.dataset.del);
+    if(state.pages.length<=1) { showToast('至少保留 1 页', 'warn'); return; }
+    // C1：保留被删页用于 5 秒撤销
+    const removedClone = JSON.parse(JSON.stringify(state.pages[idx]));
+    const prevPageIdx = state.currentPageIndex;
+    state.pages.splice(idx,1);
+    if(state.currentPageIndex>=state.pages.length) state.currentPageIndex=state.pages.length-1;
+    render(); pushHistory('删除页');
+    showRestoreToast(`已删除第 ${idx+1} 页`, () => {
+      const insertAt = Math.min(idx, state.pages.length);
+      state.pages.splice(insertAt, 0, removedClone);
+      state.currentPageIndex = insertAt;
+      render(); pushHistory('恢复页');
+      showToast('✓ 已恢复页面', 'success');
+    });
+    return;
+  }
   const pill=e.target.closest('.page-pill');
   if(pill) { state.currentPageIndex=parseInt(pill.dataset.index); render(); return; }
   if(e.target.closest('.page-add') && state.pages.length<18) { state.pages.push(createPage(cp().template)); state.currentPageIndex=state.pages.length-1; render(); pushHistory('新建页'); }
@@ -5769,10 +5879,18 @@ document.addEventListener('keydown', e => {
 window.addEventListener('resize', scalePreview);
 
 // ====== Export ======
+// C1：导出可靠性
+// - 等待 document.fonts.ready，避免字体未就绪导致 PNG 中文糊化/回退
+// - 超时阈值从 12s → 30s（大量图片/复杂表格的真实耗时常 > 12s）
+// - 失败给「重试」action toast 入口，避免静默丢失成果
+const EXPORT_TIMEOUT_MS = 30000;
+
 // 导出期间临时禁用霞鹜文楷样式表：其 97 个分片 @font-face 会让 html-to-image
 // 遍历 CSSOM 极慢甚至超时（本地化后尤甚）。屏显正常，导出后立即恢复；
 // PNG 中衬线/手写气质回退系统楷体（与未内联字体时一致，可接受）。
 async function _withExportCss(run) {
+  // 等字体就绪——避免 PNG 中文回退到 fallback
+  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch(_) {}
   // 彻底从 DOM 摘除霞鹜文楷 <link>（仅 disabled 无效：html-to-image 仍会 fetch
   // 其 href 并解析 97 个分片 @font-face @import 链，导致导出极慢/超时）。
   const removed = [...document.querySelectorAll('link[rel="stylesheet"]')]
@@ -5783,11 +5901,10 @@ async function _withExportCss(run) {
   finally { removed.forEach(r => { try { r.parent.insertBefore(r.el, r.next); } catch(e){} }); }
 }
 
-async function exportPage(idx) {
+async function exportPage(idx, isRetry = false) {
   const prev = state.currentPageIndex;
   state.currentPageIndex = idx; renderCard(); renderTemplateTabs();
   await new Promise(r => setTimeout(r, 200));
-  const TIMEOUT_MS = 12000;
   try {
     const url = await _withExportCss(() => Promise.race([
       htmlToImage.toPng(els.cardOutput, {
@@ -5803,16 +5920,20 @@ async function exportPage(idx) {
           return true;
         }
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), TIMEOUT_MS))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), EXPORT_TIMEOUT_MS))
     ]));
     const a = document.createElement('a'); a.download = `笔记-${idx+1}.png`; a.href = url; a.click();
     return true;
   } catch(err) {
     console.error(err);
-    if (err && err.message === 'TIMEOUT') {
-      showToast(`导出超时（${TIMEOUT_MS/1000}s）。建议：减少图片数量 / 关闭玻璃态主题 / 缩小画幅`, 'error', 5000);
+    const isTimeout = err && err.message === 'TIMEOUT';
+    const baseMsg = isTimeout
+      ? `导出超时（${EXPORT_TIMEOUT_MS/1000}s），可减少图片/关闭玻璃态/缩小画幅`
+      : `导出失败：${(err && err.message) || '未知错误'}`;
+    if (!isRetry) {
+      showActionToast(baseMsg, '重试', () => exportPage(idx, true), 6000, 'toast-error');
     } else {
-      showToast('导出失败：' + (err && err.message ? err.message : '未知错误'), 'error', 4000);
+      showToast(baseMsg, 'error', 5000);
     }
     return false;
   } finally {
@@ -5832,7 +5953,7 @@ els.exportAll.addEventListener('click', async () => {
 });
 
 // ====== Long Image Export — 拼接所有页面为单张长图 ======
-async function _renderPageToDataUrl(idx, timeout = 12000) {
+async function _renderPageToDataUrl(idx, timeout = EXPORT_TIMEOUT_MS) {
   const prev = state.currentPageIndex;
   state.currentPageIndex = idx;
   renderCard(); renderTemplateTabs();
