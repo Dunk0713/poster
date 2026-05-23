@@ -3775,19 +3775,34 @@ function _renderBlocksUI(page) {
   });
   h += `</div>`;
   h += `<button class="add-block-btn" style="width:100%;margin:8px 0 4px;padding:9px;font-weight:700;background:#2a1a0e;color:#fff;border-color:#2a1a0e" onclick="App.openSmartPaste()" title="从 Wind/Excel 复制表格或数字、或粘贴营销文案，一键解析成卡片">📋 智能粘贴（一键成图）</button>`;
+  // C3：块类型搜索框（28 种块按钮在分组里发现成本高，加搜索过滤）
+  const _bsv = (state._blockSearch || '').toLowerCase();
+  h += `<input class="form-input" id="blockSearch" placeholder="🔍 搜索块类型（如：高亮、表格、KPI…）" value="${escAttr(state._blockSearch||'')}" style="margin:6px 0 6px;font-size:11px;padding:6px 9px" autocomplete="off">`;
   const BLOCK_GROUPS = [
     { label: '文本', types: ['text','bullets','numbered','checklist','highlight','callout','quote','infocard','sectionHeader'] },
     { label: '数据', types: ['keystat','kpigrid','ranking','progress','sparkcard','table'] },
     { label: '视觉', types: ['image','gallery','textWrap','tags','qrcode'] },
     { label: '版式', types: ['tldr','panel','grid','divider','disclaimer'] },
   ];
+  let totalShown = 0;
   BLOCK_GROUPS.forEach(g => {
+    // 计算当前组在搜索后还剩几个
+    const visibleTypes = g.types.filter(t => {
+      if (!BLOCK_TYPES[t]) return false;
+      if (!_bsv) return true;
+      return BLOCK_TYPES[t].toLowerCase().includes(_bsv) || t.toLowerCase().includes(_bsv);
+    });
+    if (!visibleTypes.length) return;
+    totalShown += visibleTypes.length;
     h += `<div class="add-block-group"><div class="add-block-group-label">${g.label}</div><div class="add-block-row">`;
-    g.types.forEach(type => {
-      if (BLOCK_TYPES[type]) h += `<button class="add-block-btn" onclick="App.addBlock('${type}')">+ ${BLOCK_TYPES[type]}</button>`;
+    visibleTypes.forEach(type => {
+      h += `<button class="add-block-btn" data-blktype="${type}" onclick="App.addBlock('${type}')">+ ${BLOCK_TYPES[type]}</button>`;
     });
     h += `</div></div>`;
   });
+  if (_bsv && totalShown === 0) {
+    h += `<div class="form-hint" style="text-align:center;padding:10px;color:#b0a090">没有匹配的块类型</div>`;
+  }
   return h;
 }
 
@@ -3958,7 +3973,8 @@ function renderEditorFields(immediate = true) {
 // undo() 弹出栈顶 → 应用新栈顶 → 即恢复到 mutation 之前的状态。
 const _history = { stack: [], max: 40, _typingTimer: null };
 function _snapshot() {
-  const { _uiFolded, _ui, ...rest } = state;
+  // C3: _blockSearch 是 UI 临时态，不入快照、不入撤销栈
+  const { _uiFolded, _ui, _blockSearch, ...rest } = state;
   try { return JSON.stringify(rest); } catch(e) { console.error('snapshot fail', e); return null; }
 }
 function pushHistory(label) {
@@ -5796,6 +5812,16 @@ function render() {
 }
 
 // ====== Event Listeners ======
+// C3：块类型搜索框（delegation——每次 renderEditorFields 重建 DOM 也不掉绑）
+document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'blockSearch') {
+    state._blockSearch = e.target.value;
+    const focusInfo = _saveFocus();
+    renderEditorFields_raw();
+    _restoreFocus(focusInfo);
+  }
+});
+
 els.templateTabs.addEventListener('click', e => {
   const t=e.target.closest('.template-tab'); if(!t)return;
   const page = cp();
@@ -5815,7 +5841,7 @@ els.templateTabs.addEventListener('click', e => {
   }
   render();
 });
-els.paletteRow.addEventListener('click', e => { const s=e.target.closest('.theme-card, .palette-swatch'); if(!s)return; state.theme=s.dataset.theme; renderPalette(); renderCard(); });
+els.paletteRow.addEventListener('click', e => { const s=e.target.closest('.theme-card, .palette-swatch'); if(!s)return; const _prev=state.theme; state.theme=s.dataset.theme; if(_prev!==state.theme){ renderPalette(); renderCard(); pushHistory('切换主题·'+(s.title||state.theme)); } });
 {
   const _cai = document.getElementById('customAccentInput');
   const _cac = document.getElementById('customAccentClear');
