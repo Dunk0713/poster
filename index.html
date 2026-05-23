@@ -441,14 +441,29 @@ body {
   --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
   --space-5:24px; --space-6:32px; --space-7:40px; --space-8:56px;
   --space-9:72px; --space-10:96px;
-  --radius-sm:10px; --radius-md:16px; --radius-lg:24px; --radius-xl:32px;
+  --radius-sm:10px; --radius-md:16px; --radius-lg:24px; --radius-xl:32px; --radius-pill:9999px;
   --bg-angle:170deg;
-  /* 涨跌语义色（A股红涨绿跌默认值；深色主题下覆盖为高对比亮色） */
+  /* C2：投影梯度（原仅 --shad 单值，块层级硬编码 0 2px / 0 3px / 0 4px） */
+  --shad-sm: 0 2px 8px var(--shad);
+  --shad-md: 0 2px 10px var(--shad);
+  --shad-lg: 0 3px 14px var(--shad);
+  --shad-xl: 0 4px 16px var(--shad);
+  /* C2：过渡 / 缓动 token（原全文硬编码 0.15s / 0.2s / 0.3s） */
+  --dur-fast: 120ms; --dur-base: 200ms; --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* 涨跌语义色（A股红涨绿跌默认值；浅色主题降饱和、深色主题覆盖为高对比亮色） */
   --pos:#d63031; --neg:#1e8a3e;
   --accent-s:rgba(0,0,0,0.28);  /* overridden per theme */
   /* 字体系统：默认（系统无衬线）。各 mood 同时覆盖标题字体与正文字体以保持风格统一 */
   --font-base: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB", sans-serif;
   --font-display: var(--font-base);
+}
+/* C2：UI 层 z-index token（card 之外的全局浮层与控件层级，统一管理） */
+:root {
+  --z-base: 0; --z-raised: 2; --z-sticky: 10;
+  --z-dock: 100; --z-dropdown: 500; --z-modal: 700;
+  --z-toast: 1000; --z-overlay: 1100;
 }
 /* 全局正文字体：所有 .card 内的文本默认走 --font-base，跟随主题切换 */
 .card {
@@ -560,6 +575,7 @@ body {
   --accent:#b5572a; --accent-l:rgba(181,87,42,0.08); --accent-m:rgba(181,87,42,0.16); --accent-s:rgba(181,87,42,0.28);
   --line:rgba(0,0,0,0.10); --mod:#fff; --shad:rgba(82,40,20,0.08);
   --pill-bg:rgba(181,87,42,0.10); --pill-text:#8a4020;
+  --pos:#c2473a; --neg:#3a7a52;
 }
 .card.theme-ivory {
   --bg1:#faf8f5; --bg2:#ede8e0; --bg-angle:180deg;
@@ -567,6 +583,7 @@ body {
   --accent:#7a5f3d; --accent-l:rgba(122,95,61,0.08); --accent-m:rgba(122,95,61,0.16); --accent-s:rgba(122,95,61,0.28);
   --line:rgba(0,0,0,0.10); --mod:#fff; --shad:rgba(82,40,20,0.08);
   --pill-bg:rgba(122,95,61,0.10); --pill-text:#5a4528;
+  --pos:#b53a36; --neg:#3e7a4a;
 }
 .card.theme-sage {
   --bg1:#f4f6f2; --bg2:#e4ebe0; --bg-angle:190deg;
@@ -574,6 +591,7 @@ body {
   --accent:#3d7a52; --accent-l:rgba(61,122,82,0.08); --accent-m:rgba(61,122,82,0.16); --accent-s:rgba(61,122,82,0.28);
   --line:rgba(0,0,0,0.10); --mod:#fff; --shad:rgba(10,20,40,0.10);
   --pill-bg:rgba(61,122,82,0.10); --pill-text:#285a38;
+  --pos:#b8423c; --neg:#2f6a44;
 }
 .card.theme-blue {
   --bg1:#f4f7fa; --bg2:#e2eaf4; --bg-angle:150deg;
@@ -581,6 +599,7 @@ body {
   --accent:#2a5ad0; --accent-l:rgba(42,90,208,0.08); --accent-m:rgba(42,90,208,0.16); --accent-s:rgba(42,90,208,0.28);
   --line:rgba(0,0,0,0.10); --mod:#fff; --shad:rgba(10,20,40,0.10);
   --pill-bg:rgba(42,90,208,0.10); --pill-text:#1a3a9a;
+  --pos:#c0463d; --neg:#327a52;
 }
 .card.theme-blush {
   --bg1:#faf4f5; --bg2:#f0e2e6; --bg-angle:200deg;
@@ -588,6 +607,7 @@ body {
   --accent:#c83860; --accent-l:rgba(200,56,96,0.08); --accent-m:rgba(200,56,96,0.16); --accent-s:rgba(200,56,96,0.28);
   --line:rgba(0,0,0,0.10); --mod:#fff; --shad:rgba(82,40,20,0.08);
   --pill-bg:rgba(200,56,96,0.10); --pill-text:#901838;
+  --pos:#c44552; --neg:#4a7a5a;
 }
 
 /* ── New themes ── */
@@ -597,10 +617,11 @@ body {
   --accent:#0071e3; --accent-l:rgba(0,113,227,0.08); --accent-m:rgba(0,113,227,0.16); --accent-s:rgba(0,113,227,0.28);
   --line:rgba(0,0,0,0.10); --mod:#ffffff; --shad:rgba(0,0,0,0.06);
   --pill-bg:rgba(0,113,227,0.08); --pill-text:#0055b3;
+  --pos:#d1503e; --neg:#3a8260;
 }
 .card.theme-dark {
   --bg1:#1a1a2e; --bg2:#16213e; --bg-angle:145deg;
-  --title:#e8e8ff; --body:#d0d0e8; --sub:#9292b8;
+  --title:#eef0f6; --body:#d4d8e2; --sub:#9aa2b8;
   --accent:#b89aff; --accent-l:rgba(184,154,255,0.08); --accent-m:rgba(184,154,255,0.16); --accent-s:rgba(184,154,255,0.28);
   --line:rgba(255,255,255,0.10); --mod:rgba(255,255,255,0.06); --shad:rgba(0,0,0,0.3);
   --pill-bg:rgba(184,154,255,0.15); --pill-text:#d4bcff;
@@ -611,6 +632,7 @@ body {
   --accent:#6366f1; --accent-l:rgba(99,102,241,0.08); --accent-m:rgba(99,102,241,0.16); --accent-s:rgba(99,102,241,0.28);
   --line:rgba(0,0,0,0.10); --mod:rgba(255,255,255,0.65); --shad:rgba(10,20,40,0.10);
   --pill-bg:rgba(99,102,241,0.10); --pill-text:#4f46e5;
+  --pos:#c64a45; --neg:#3d7a5a;
 }
 .card.theme-glass .card-bg {
   background: linear-gradient(135deg, rgba(200,210,255,0.4) 0%, rgba(255,220,240,0.3) 50%, rgba(200,240,255,0.4) 100%) !important;
@@ -629,6 +651,7 @@ body {
   --accent:#e040a0; --accent-l:rgba(224,64,160,0.08); --accent-m:rgba(224,64,160,0.16); --accent-s:rgba(224,64,160,0.28);
   --line:rgba(0,0,0,0.10); --mod:rgba(255,255,255,0.85); --shad:rgba(82,40,20,0.08);
   --pill-bg:rgba(224,64,160,0.10); --pill-text:#c03080;
+  --pos:#c84860; --neg:#3d8a6e;
 }
 /* 收掉 6 色阶"模板感"长虹，改为与高级主题一致的柔和双径向洗色（保留彩色个性） */
 .card.theme-rainbow .card-bg {
@@ -639,7 +662,7 @@ body {
 }
 .card.theme-midnight {
   --bg1:#0f0f1a; --bg2:#1a1a30; --bg-angle:170deg;
-  --title:#ffffff; --body:#dcdcee; --sub:#a6a6c8;
+  --title:#ffffff; --body:#e0e3ec; --sub:#a8b0c4;
   --accent:#00d4ff; --accent-l:rgba(0,212,255,0.08); --accent-m:rgba(0,212,255,0.16); --accent-s:rgba(0,212,255,0.28);
   --line:rgba(255,255,255,0.10); --mod:rgba(255,255,255,0.05); --shad:rgba(0,0,0,0.4);
   --pill-bg:rgba(0,212,255,0.12); --pill-text:#00d4ff;
@@ -653,7 +676,7 @@ body {
 }
 .card.theme-navy {
   --bg1:#0b1d3a; --bg2:#13294d; --bg-angle:175deg;
-  --title:#f5ecd6; --body:#d8dce8; --sub:#a8b8d4;
+  --title:#f5ecd6; --body:#dde2ec; --sub:#aab5c8;
   --accent:#e8b84a; --accent-l:rgba(232,184,74,0.14); --accent-m:rgba(232,184,74,0.22); --accent-s:rgba(232,184,74,0.38);
   --line:rgba(245,236,214,0.12); --mod:rgba(245,236,214,0.04); --shad:rgba(0,0,0,0.35);
   --pill-bg:rgba(232,184,74,0.14); --pill-text:#e8b84a;
@@ -685,7 +708,41 @@ body {
   --accent:#d45220; --accent-l:rgba(212,82,32,0.08); --accent-m:rgba(212,82,32,0.16); --accent-s:rgba(212,82,32,0.28);
   --line:rgba(0,0,0,0.10); --mod:#fff; --shad:rgba(82,40,20,0.08);
   --pill-bg:rgba(212,82,32,0.10); --pill-text:#9a3a10;
+  --pos:#c4502d; --neg:#3e7a4e;
 }
+
+/* C2：新增「高级感」主题——莫兰迪 / 暖石 / 水墨（低饱和、降对比，适合长阅读型科普卡片） */
+.card.theme-morandi {
+  --bg1:#eeece6; --bg2:#dfdcd2; --bg-angle:170deg;
+  --title:#3a3d36; --body:#52564c; --sub:#959890;
+  --accent:#7a8073; --accent-l:rgba(122,128,115,0.10); --accent-m:rgba(122,128,115,0.18); --accent-s:rgba(122,128,115,0.30);
+  --line:rgba(0,0,0,0.08); --mod:#f5f3ed; --shad:rgba(60,60,50,0.07);
+  --pill-bg:rgba(122,128,115,0.12); --pill-text:#52564c;
+  --pos:#a8584a; --neg:#5a7a62;
+}
+.card.theme-warmstone {
+  --bg1:#f3eee6; --bg2:#e5ddcf; --bg-angle:175deg;
+  --title:#352d22; --body:#4f4334; --sub:#9d8e7a;
+  --accent:#8a6c4e; --accent-l:rgba(138,108,78,0.10); --accent-m:rgba(138,108,78,0.18); --accent-s:rgba(138,108,78,0.30);
+  --line:rgba(0,0,0,0.08); --mod:#faf6ee; --shad:rgba(80,55,30,0.08);
+  --pill-bg:rgba(138,108,78,0.12); --pill-text:#664a30;
+  --pos:#b25a3a; --neg:#5e7a52;
+}
+.card.theme-ink {
+  --bg1:#f5f3ef; --bg2:#e6e2d8; --bg-angle:180deg;
+  --title:#1c2028; --body:#384048; --sub:#7a808a;
+  --accent:#384048; --accent-l:rgba(56,64,72,0.08); --accent-m:rgba(56,64,72,0.16); --accent-s:rgba(56,64,72,0.30);
+  --line:rgba(0,0,0,0.10); --mod:#fdfcf8; --shad:rgba(20,25,35,0.08);
+  --pill-bg:rgba(56,64,72,0.10); --pill-text:#1c2028;
+  --pos:#a84c3e; --neg:#3e6a52;
+}
+.card.theme-ink .card-bg {
+  background:
+    radial-gradient(ellipse at 18% 16%, rgba(56,64,72,0.04) 0%, transparent 55%),
+    radial-gradient(ellipse at 82% 84%, rgba(120,90,60,0.05) 0%, transparent 55%),
+    linear-gradient(var(--bg-angle), var(--bg1) 0%, var(--bg2) 100%) !important;
+}
+
 /* Dark theme text adjustments */
 .card.theme-dark .card-accent-bottom,
 .card.theme-midnight .card-accent-bottom { opacity: 0.7; }
@@ -764,6 +821,13 @@ body {
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude; z-index: -1;
 }
+/* C2：mask-composite 在 Safari ≤ 15.3 不支持——降级为单色边框，避免完全失效 */
+@supports not (mask-composite: exclude) {
+  .block-gradient-border::before {
+    background: transparent;
+    border: 2px solid var(--accent);
+    -webkit-mask: none; mask: none;
+}
 .block-soft {
   border-radius: var(--radius-lg) !important;
   box-shadow: 0 4px 24px rgba(0,0,0,0.05) !important;
@@ -823,7 +887,7 @@ body {
 .cb-highlight {
   background: var(--mod); border-radius: var(--radius-md);
   border-left: 6px solid var(--accent);
-  padding: var(--space-6) var(--space-7); margin-bottom: var(--space-6); box-shadow: 0 2px 10px var(--shad);
+  padding: var(--space-6) var(--space-7); margin-bottom: var(--space-6); box-shadow: var(--shad-md);
 }
 .cb-highlight .mod-label { font-size: var(--fs-micro); font-weight: 650; letter-spacing: var(--tr-cap); color: var(--accent); margin-bottom: var(--space-3); }
 .cb-highlight .mod-label.sz-s { font-size: 18px; letter-spacing: var(--tr-cap); margin-bottom: var(--space-2); }
@@ -873,7 +937,7 @@ body {
 /* ── Block: Info card ── */
 .cb-infocard {
   background: var(--mod); border-radius: var(--radius-md); border: 1px solid var(--line);
-  padding: var(--space-6) var(--space-7); margin-bottom: var(--space-6); box-shadow: 0 2px 10px var(--shad);
+  padding: var(--space-6) var(--space-7); margin-bottom: var(--space-6); box-shadow: var(--shad-md);
 }
 .cb-infocard .ic-num {
   font-size: var(--fs-cap); font-weight: 650; color: var(--accent); letter-spacing: 0.08em;
@@ -903,8 +967,8 @@ body {
 /* ── Block: Grid ── */
 .cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: var(--space-6); }
 .cb-grid-item {
-  background: var(--mod); border-radius: 14px; padding: 26px 24px;
-  border: 1px solid var(--line); box-shadow: 0 2px 8px var(--shad);
+  background: var(--mod); border-radius: var(--radius-md); padding: 26px 24px;
+  border: 1px solid var(--line); box-shadow: var(--shad-sm);
 }
 .cb-grid-item .gi-label { font-size: var(--fs-cap); font-weight: 650; letter-spacing: var(--tr-label); color: var(--accent); margin-bottom: var(--space-2); }
 .cb-grid-item .gi-text { font-size: 28px; line-height: var(--lh-body); color: var(--body); }
@@ -1038,13 +1102,13 @@ body {
 
 /* ── Block: KPI Grid (2×2) ── */
 .cb-kpigrid { margin: var(--space-5) 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.cb-kpigrid .k-cell { background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; }
+.cb-kpigrid .k-cell { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; }
 .cb-kpigrid .k-label { font-size: var(--fs-xs); letter-spacing: var(--tr-label); color: var(--sub); font-weight: 550; }
 .cb-kpigrid .k-value { font-family: var(--font-display); font-size: 38px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: var(--title); }
 .cb-kpigrid .k-delta-row { margin-top: 2px; }
 
 /* ── Block: Sparkcard (trend card) ── */
-.cb-sparkcard { margin: var(--space-5) 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; color: var(--accent); }
+.cb-sparkcard { margin: var(--space-5) 0; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px 20px; color: var(--accent); }
 .cb-sparkcard .sc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .cb-sparkcard .sc-left { display: flex; flex-direction: column; gap: 2px; }
 .cb-sparkcard .sc-title { font-size: var(--fs-xs); letter-spacing: var(--tr-label); color: var(--sub); font-weight: 550; }
@@ -1111,7 +1175,7 @@ body {
 .cb-callout {
   position: relative; display: flex; gap: 18px; align-items: flex-start;
   margin: var(--space-5) 0; padding: 20px 24px 20px 22px;
-  border-radius: 14px; border: 1px solid var(--c-border, rgba(0,0,0,0.06));
+  border-radius: var(--radius-md); border: 1px solid var(--c-border, rgba(0,0,0,0.06));
   background: var(--c-bg, rgba(0,0,0,0.03));
   border-left: 5px solid var(--c-accent, var(--accent));
 }
@@ -1322,7 +1386,7 @@ body {
 .card-body > .cb-disclaimer { margin-bottom: var(--space-block); }
 
 /* ── Block: Image ── */
-.cb-image { margin-bottom: var(--space-6); border-radius: 18px; overflow: hidden; box-shadow: 0 3px 14px var(--shad); }
+.cb-image { margin-bottom: var(--space-6); border-radius: 18px; overflow: hidden; box-shadow: var(--shad-lg); }
 .cb-image.fit-cover { height: 420px; }
 .cb-image.fit-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cb-image.fit-contain { background: var(--accent-l); text-align: center; padding: 10px 10px 0; }
@@ -1332,7 +1396,7 @@ body {
 .cb-image.fit-contain.ih-s img { max-height: 200px; } .cb-image.fit-contain.ih-m img { max-height: 360px; } .cb-image.fit-contain.ih-l img { max-height: 520px; }
 
 /* ── Image area (imageText top) ── */
-.card-image-area { border-radius: 20px; overflow: hidden; margin-bottom: 30px; box-shadow: 0 4px 16px var(--shad); }
+.card-image-area { border-radius: 20px; overflow: hidden; margin-bottom: 30px; box-shadow: var(--shad-xl); }
 .card-image-area.fit-cover { height: 420px; } /* default; overridden by inline style when slider used */
 .card-image-area.fit-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card-image-area.fit-contain img[style*="max-height"] { width: auto; }
@@ -1603,7 +1667,7 @@ body {
 .card-table {
   width: 100%; border-collapse: separate; border-spacing: 0;
   border-radius: 16px; overflow: hidden; border: 1px solid var(--line);
-  background: var(--mod); box-shadow: 0 2px 10px var(--shad); margin-bottom: 24px;
+  background: var(--mod); box-shadow: var(--shad-md); margin-bottom: 24px;
 }
 .card-table th { background: var(--accent-m); font-size: 28px; font-weight: 700; color: var(--title); padding: 20px 26px; text-align: left; border-bottom: 1px solid var(--line); }
 .card-table td { font-size: 30px; color: var(--body); padding: 18px 26px; border-bottom: 1px solid var(--line); }
@@ -1808,7 +1872,7 @@ body {
 .cb-stat-compare {
   display: flex; align-items: center; gap: 18px;
   margin: var(--space-4) 0; padding: 16px 20px;
-  background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius-md);
 }
 .cb-stat-compare .sc-label {
   flex: 1; font-size: var(--fs-body); color: var(--body); font-weight: 500;
@@ -1858,8 +1922,8 @@ body {
 .cb-text-wrap.sz-ms { font-size: 30px; } .cb-text-wrap.sz-ml { font-size: 36px; }
 .cb-text-wrap.sz-l { font-size: 38px; } .cb-text-wrap.sz-xl { font-size: 44px; }
 .cb-text-wrap .wrap-img {
-  width: 280px; border-radius: 14px; overflow: hidden;
-  box-shadow: 0 3px 14px var(--shad); margin-bottom: 12px;
+  width: 280px; border-radius: var(--radius-md); overflow: hidden;
+  box-shadow: var(--shad-lg); margin-bottom: 12px;
 }
 .cb-text-wrap .wrap-img.wrap-left { float: left; margin-right: 28px; shape-outside: margin-box; }
 .cb-text-wrap .wrap-img.wrap-right { float: right; margin-left: 28px; shape-outside: margin-box; }
@@ -2186,6 +2250,10 @@ const THEMES = [
   { id: 'warm',       label: '暖橘',  colors: ['#fdf6ee','#f8ece0'], accent: '#d45220' },
   { id: 'glass',      label: '玻璃',  colors: ['#e8ecfa','#d8e0f4'], accent: '#6366f1' },
   { id: 'rainbow',    label: '彩虹',  colors: ['#fef9ff','#f0e8fa'], accent: '#e040a0' },
+  // C2：低饱和「高级感」主题——莫兰迪灰绿 / 暖石灰 / 水墨
+  { id: 'morandi',    label: '莫兰迪',colors: ['#eeece6','#dfdcd2'], accent: '#7a8073' },
+  { id: 'warmstone',  label: '暖石',  colors: ['#f3eee6','#e5ddcf'], accent: '#8a6c4e' },
+  { id: 'ink',        label: '水墨',  colors: ['#f5f3ef','#e6e2d8'], accent: '#384048' },
   { id: 'dark',       label: '深邃',  colors: ['#1a1a2e','#2a2a44'], accent: '#b89aff' },
   { id: 'midnight',   label: '宇宙',  colors: ['#0f0f1a','#1a1a30'], accent: '#00d4ff' },
   { id: 'navy',       label: '黑金',  colors: ['#0b1d3a','#13294d'], accent: '#e8b84a' },
