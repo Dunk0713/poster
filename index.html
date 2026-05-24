@@ -90,6 +90,17 @@ body {
 .form-textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
 .form-hint { font-size: 11px; color: #b0a090; margin-top: 3px; }
 
+/* ── Looks (一键搭配 主题+气质+密度) ── */
+.looks-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.look-chip {
+  padding: 5px 10px; border: 1px solid #e0d8cf; border-radius: 14px;
+  background: #fff; font-size: 11px; cursor: pointer;
+  color: #7a6a5a; font-family: inherit; transition: all 0.15s;
+  white-space: nowrap;
+}
+.look-chip:hover { border-color: #c4673a; color: #c4673a; transform: translateY(-1px); }
+.look-chip.active { background: #c4673a; color: #fff; border-color: #c4673a; }
+
 /* ── Palette (theme cards) ── */
 .palette-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .theme-card {
@@ -468,6 +479,8 @@ body {
 /* 全局正文字体：所有 .card 内的文本默认走 --font-base，跟随主题切换 */
 .card {
   font-family: var(--font-base);
+  /* C4：让 --tr-body 真正生效——子元素未显式设字距时继承（card-title 等显式覆盖不受影响） */
+  letter-spacing: var(--tr-body);
   /* 中西文混排：tnum 等宽数字 / palt 比例标点（中文标点不再占满全角） */
   font-feature-settings: "tnum" 1, "palt" 1, "halt" 1;
   text-spacing-trim: space-all;  /* 自动修剪句首/句末标点的额外空白（CSS Text 4） */
@@ -475,11 +488,12 @@ body {
 }
 
 /* ── Global mood (气质) — 标题 + 正文一起变化 ── */
-/* 编辑部：衬线宋体气质，杂志感 */
+/* 编辑部：衬线宋体气质，杂志感 — C4：紧字距 + 紧行高 + 重标题（杂志感更足） */
 .card.mood-editorial {
   --font-base: 'Source Han Serif SC', 'Noto Serif CJK SC', 'Songti SC', 'STSong', '宋体', Georgia, 'Times New Roman', serif;
   --font-display: 'Playfair Display', 'Source Han Serif SC', 'Songti SC', '宋体', Georgia, serif;
-  --tr-title: -0.025em;
+  --tr-title: -0.025em; --tr-body: 0.005em;
+  --lh-tight: 1.1; --lh-body: 1.6;
   --space-9: 88px; --space-10: 112px;
 }
 .card.mood-editorial .card-title,
@@ -487,10 +501,12 @@ body {
 .card.mood-editorial .cb-highlight .mod-label,
 .card.mood-editorial .cb-section-header .sh-label { font-weight: 550; }
 
-/* 极简：仍是无衬线但更轻量、更舒展 */
+/* 极简：仍是无衬线但更轻量、更舒展 — C4：宽字距 + 大行高 + 轻字重（极简通透感） */
 .card.mood-minimal {
   --font-base: 'Helvetica Neue', -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-display: var(--font-base);
+  --tr-title: -0.02em; --tr-body: 0.015em;
+  --lh-tight: 1.2; --lh-body: 1.85; --lh-loose: 2.0;
   --space-9: 112px; --space-10: 144px;
   --fs-body: 34px;
 }
@@ -501,22 +517,24 @@ body {
 .card.mood-minimal .cover-title { font-weight: 550; letter-spacing: -0.02em; }
 .card.mood-minimal .cb-text { font-weight: 350; }
 
-/* 文人：纯衬线（楷体感强，正文也用衬线） */
+/* 文人：纯衬线（楷体感强，正文也用衬线） — C4：默认字距 + 大行高（楷体呼吸感） */
 .card.mood-serif {
   --font-base: 'LXGW WenKai', '霞鹜文楷', 'KaiTi', 'STKaiti', '楷体', 'Source Han Serif SC', serif;
   --font-display: 'LXGW WenKai', '霞鹜文楷', 'KaiTi', 'Source Han Serif SC', '宋体', serif;
-  --tr-title: -0.005em;
+  --tr-title: -0.005em; --tr-body: 0.02em;
+  --lh-tight: 1.25;
   --lh-body: 1.85;
   --lh-loose: 1.95;  /* 楷体正文更舒展；统一后正文族走 --lh-loose 才生效 */
 }
 .card.mood-serif .card-title,
 .card.mood-serif .cover-title { font-weight: 600; }
 
-/* 亲和：圆体 / 圆润感（正文与标题都偏圆） */
+/* 亲和：圆体 / 圆润感（正文与标题都偏圆） — C4：紧凑字距 + 中行高（饱满温暖） */
 .card.mood-rounded {
   --font-base: 'HarmonyOS Sans SC', 'PingFang SC', 'Hiragino Sans GB', "Microsoft YaHei", "Helvetica Rounded", "Arial Rounded MT Bold", sans-serif;
   --font-display: 'HarmonyOS Sans SC', 'PingFang SC', "Helvetica Rounded", "Arial Rounded MT Bold", sans-serif;
-  --tr-title: -0.01em;
+  --tr-title: -0.025em; --tr-body: 0;
+  --lh-tight: 1.18; --lh-body: 1.7;
 }
 .card.mood-rounded .card-title,
 .card.mood-rounded .cover-title { font-weight: 750; letter-spacing: -0.025em; }
@@ -525,11 +543,12 @@ body {
 .card.mood-rounded .cb-metric .m-value { font-weight: 800; }
 
 /* 报表：等宽数据感。正文回退默认无衬线（等宽中英混排呆板），
-   仅标题与数据/数字块用等宽，保留金融报表气质 */
+   仅标题与数据/数字块用等宽，保留金融报表气质 — C4：紧行高（数据密集型） */
 .card.mood-mono {
   --font-display: 'JetBrains Mono', 'SF Mono', 'Source Han Sans SC', "Microsoft YaHei", monospace;
   --tr-title: 0;
   --tr-body: 0.01em;
+  --lh-tight: 1.1; --lh-body: 1.55; --lh-loose: 1.7;
 }
 .card.mood-mono .card-title,
 .card.mood-mono .cover-title { font-weight: 700; letter-spacing: -0.01em; }
@@ -544,11 +563,12 @@ body {
   font-feature-settings: "tnum" 1, "ss01" 1;
 }
 
-/* 手写：楷体 / 手写体气质（适合温暖、感性、知识科普） */
+/* 手写：楷体 / 手写体气质（适合温暖、感性、知识科普） — C4：宽字距 + 极大行高（手写呼吸） */
 .card.mood-handwriting {
   --font-base: 'LXGW WenKai', 'KaiTi', 'STKaiti', '楷体', 'PingFang SC', cursive;
   --font-display: 'LXGW WenKai', 'KaiTi', 'STKaiti', '楷体', cursive;
-  --tr-title: 0;
+  --tr-title: 0; --tr-body: 0.03em;
+  --lh-tight: 1.3;
   --lh-body: 1.9;
   --lh-loose: 2.0;
 }
@@ -788,7 +808,7 @@ body {
 
 .card-accent-bar { width: 54px; height: 3px; background: var(--accent); border-radius: 2px; margin-bottom: var(--space-5); }
 
-.card-subtitle { font-size: var(--fs-xs); font-weight: 450; color: var(--sub); line-height: var(--lh-snug); margin-bottom: var(--space-7); letter-spacing: 0; }
+.card-subtitle { font-size: var(--fs-xs); font-weight: 450; color: var(--sub); line-height: var(--lh-snug); margin-bottom: var(--space-7); letter-spacing: var(--tr-body); }
 .card-subtitle.sz-s { font-size: 24px; }
 .card-subtitle.sz-l { font-size: 34px; }
 
@@ -839,7 +859,7 @@ body {
 }
 
 /* ── Block: Text ── */
-.cb-text { font-size: var(--fs-body); line-height: var(--lh-loose); color: var(--body); letter-spacing: 0; margin-bottom: var(--space-6); }
+.cb-text { font-size: var(--fs-body); line-height: var(--lh-loose); color: var(--body); letter-spacing: var(--tr-body); margin-bottom: var(--space-6); }
 /* sz-* 相对 --fs-body（mood 会覆盖 --fs-body）→ 不同气质下大小档一致跟随 */
 .cb-text.sz-s { font-size: calc(var(--fs-body) * 0.84); }
 .cb-text.sz-l { font-size: calc(var(--fs-body) * 1.28); }
@@ -2056,6 +2076,9 @@ body {
 
       <div id="editorFields"></div>
 
+      <div class="section-label">气质组合 <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#b0a090;font-size:10px">（一键搭配 主题+气质+密度）</span></div>
+      <div class="looks-row" id="looksRow"></div>
+
       <div class="section-label">配色方案</div>
       <div class="palette-row" id="paletteRow"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
@@ -3018,6 +3041,36 @@ function renderPalette() {
   ).join('');
   const _cai = document.getElementById('customAccentInput');
   if (_cai && /^#[0-9a-fA-F]{6}$/.test(state.customAccent||'')) _cai.value = state.customAccent;
+}
+
+// C4-1：气质组合预设（一键搭配 主题+气质+密度，免去用户在 12 主题 × 7 气质 × 3 密度组合中试错）
+const LOOKS = [
+  { name: '编辑部·深蓝', theme: 'navy',       mood: 'editorial',   density: 'airy'    },
+  { name: '杂志·象牙',   theme: 'ivory',      mood: 'editorial',   density: 'airy'    },
+  { name: '极简·纯白',   theme: 'pure',       mood: 'minimal',     density: 'airy'    },
+  { name: '莫兰迪·静',   theme: 'morandi',    mood: 'minimal',     density: 'airy'    },
+  { name: '水墨·文人',   theme: 'ink',        mood: 'serif',       density: 'airy'    },
+  { name: '暖石·手记',   theme: 'warmstone',  mood: 'serif',       density: ''        },
+  { name: '赤陶·讲台',   theme: 'terracotta', mood: 'editorial',   density: ''        },
+  { name: '柔蓝·学院',   theme: 'blue',       mood: 'rounded',     density: ''        },
+  { name: '暗金·财经',   theme: 'navy',       mood: 'mono',        density: ''        },
+  { name: '报表·深灰',   theme: 'dark',       mood: 'mono',        density: ''        },
+  { name: '宇宙·霓虹',   theme: 'midnight',   mood: 'mono',        density: 'compact' },
+  { name: '手写·温暖',   theme: 'terracotta', mood: 'handwriting', density: 'airy'    },
+];
+
+function _looksMatchKey(l) { return [l.theme, l.mood||'', l.density||''].join('|'); }
+function _stateMatchKey()  { return [state.theme, state.fontMood||'', state.density||''].join('|'); }
+
+function renderLooks() {
+  const row = document.getElementById('looksRow');
+  if (!row) return;
+  const active = _stateMatchKey();
+  row.innerHTML = LOOKS.map(l => {
+    const isActive = _looksMatchKey(l) === active;
+    const sub = `${l.theme} · ${l.mood||'默认'} · ${l.density||'标准'}`;
+    return `<button type="button" class="look-chip ${isActive?'active':''}" data-look="${escAttr(l.name)}" title="${escAttr(sub)}">${esc(l.name)}</button>`;
+  }).join('');
 }
 
 // ====== Render: Font Size ======
@@ -5808,7 +5861,7 @@ function scalePreview() {
 // ====== Full Render ======
 function render() {
   renderTemplateTabs(); renderEditorFields();
-  renderPalette(); renderFontSize();
+  renderPalette(); renderLooks(); renderFontSize();
   renderPageStrip(); renderCard(); scalePreview();
 }
 
@@ -5842,7 +5895,21 @@ els.templateTabs.addEventListener('click', e => {
   }
   render();
 });
-els.paletteRow.addEventListener('click', e => { const s=e.target.closest('.theme-card, .palette-swatch'); if(!s)return; const _prev=state.theme; state.theme=s.dataset.theme; if(_prev!==state.theme){ renderPalette(); renderCard(); pushHistory('切换主题·'+(s.title||state.theme)); } });
+els.paletteRow.addEventListener('click', e => { const s=e.target.closest('.theme-card, .palette-swatch'); if(!s)return; const _prev=state.theme; state.theme=s.dataset.theme; if(_prev!==state.theme){ renderPalette(); renderLooks(); renderCard(); pushHistory('切换主题·'+(s.title||state.theme)); } });
+
+// C4-1：LOOKS 一键搭配（delegation——容器静态但内容动态）
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.look-chip');
+  if (!chip) return;
+  const look = LOOKS.find(l => l.name === chip.dataset.look);
+  if (!look) return;
+  state.theme = look.theme;
+  state.fontMood = look.mood || '';
+  state.density = look.density || '';
+  render();
+  pushHistory('应用预设·' + look.name);
+  showToast('已应用「' + look.name + '」', 'success', 1500);
+});
 {
   const _cai = document.getElementById('customAccentInput');
   const _cac = document.getElementById('customAccentClear');
