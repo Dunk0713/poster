@@ -2375,7 +2375,7 @@ function makeBlock(type) {
     case 'panel':     return { ...base, type, title: '精品业绩 · 长期超额', subtitle: '', children: [ makeBlock('keystat') ] };
     case 'tags':      return { ...base, type, items: [''] };
     case 'grid':      return { ...base, type, items: [{ label:'', text:'' }, { label:'', text:'' }] };
-    case 'divider':   return { type, spacing: '' };
+    case 'divider':   return { _uid: _genUid(), type, spacing: '' };
     case 'checklist': return { ...base, type, items: [{ text: '', done: false }] };
     case 'image':     return { ...base, type, src: '', caption: '', fit: 'contain', h: 0, cropX: 50, cropY: 50, zoom: 1 };
     case 'sectionHeader': return { ...base, type, label: '', num: '', icon: '', shStyle: '' };
